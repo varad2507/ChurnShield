@@ -1,0 +1,3716 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ChurnShield · Vitals Churn Intelligence</title>
+
+  <!-- Fonts & Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,300;14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap"
+    rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  <!-- Export libraries: SheetJS for .xlsx, jsPDF for .pdf -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    /* ── Reset & Base Design System ── */
+    *,
+    *::before,
+    *::after {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      transition: background-color 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    :root {
+      --primary: #6c3cff;
+      --primary-light: #8a6aff;
+      --primary-dark: #4a1fc7;
+      --primary-glow: rgba(108, 60, 255, 0.35);
+      --secondary: #00d4ff;
+      --bg-dark: #0b0a12;
+      --bg-card: rgba(18, 16, 32, 0.88);
+      --bg-card-hover: rgba(28, 25, 48, 0.92);
+      --text-primary: #f0edff;
+      --text-secondary: #a8a0c8;
+      --text-muted: #6b6490;
+      --border-subtle: rgba(108, 60, 255, 0.18);
+      --border-focus: rgba(108, 60, 255, 0.5);
+      --shadow-soft: 0 20px 60px rgba(0, 0, 0, 0.7);
+      --radius: 20px;
+      --radius-sm: 12px;
+      --transition: 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+
+      --ink: #0B0E14;
+      --panel: rgba(18, 22, 31, 0.85);
+      --panel-solid: #12161F;
+      --panel-alt: rgba(23, 28, 39, 0.9);
+      --line: #232A38;
+      --text: #E7EBF3;
+      --text-dim: #8B93A7;
+      --critical: #FF5C5C;
+      --warn: #F2B84B;
+      --safe: #2BD4A0;
+      --signal: #6c3cff;
+      --signal-glow: rgba(108, 60, 255, 0.25);
+      --glass-border: rgba(255, 255, 255, 0.08);
+      --shadow-glow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+
+    [data-theme="light"] {
+      --bg-dark: #F4F6FB;
+      --ink: #F4F6FB;
+      --panel: rgba(255, 255, 255, 0.9);
+      --panel-solid: #FFFFFF;
+      --panel-alt: #EBF0F9;
+      --line: #D0D7E5;
+      --text: #111827;
+      --text-dim: #6B7280;
+      --text-primary: #111827;
+      --text-secondary: #4B5563;
+      --critical: #DC2626;
+      --warn: #D97706;
+      --safe: #059669;
+      --signal: #6c3cff;
+      --signal-glow: rgba(108, 60, 255, 0.15);
+      --glass-border: rgba(0, 0, 0, 0.08);
+      --shadow-glow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      min-height: 100vh;
+      overflow-x: hidden;
+      background-image:
+        radial-gradient(ellipse at 20% 50%, rgba(108, 60, 255, 0.12) 0%, transparent 60%),
+        radial-gradient(ellipse at 80% 20%, rgba(0, 212, 255, 0.07) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 100%, rgba(108, 60, 255, 0.05) 0%, transparent 40%);
+      background-attachment: fixed;
+    }
+
+    /* ── Glow Orbs (Decorative) ── */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(90px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .orb--1 {
+      width: 500px;
+      height: 500px;
+      background: rgba(108, 60, 255, 0.15);
+      top: -180px;
+      right: -120px;
+    }
+
+    .orb--2 {
+      width: 400px;
+      height: 400px;
+      background: rgba(0, 212, 255, 0.08);
+      bottom: -100px;
+      left: -100px;
+    }
+
+    /* Keyframe Animations */
+    @keyframes fadeInScale {
+      from {
+        opacity: 0;
+        transform: scale(0.96) translateY(8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+      }
+    }
+
+    @keyframes pulseGlow {
+      0% {
+        box-shadow: 0 0 0 0 rgba(43, 212, 160, 0.6);
+      }
+
+      70% {
+        box-shadow: 0 0 0 10px rgba(43, 212, 160, 0);
+      }
+
+      100% {
+        box-shadow: 0 0 0 0 rgba(43, 212, 160, 0);
+      }
+    }
+
+    @keyframes slideInRight {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    @keyframes fadeSlide {
+      0% {
+        opacity: 0;
+        transform: translateY(12px);
+      }
+
+      100% {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-entry {
+      animation: fadeInScale 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* ── Auth Screen & 2-Column Split Layout ── */
+    .auth-screen {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .auth-wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 1150px;
+      display: grid;
+      grid-template-columns: 1fr 1.15fr;
+      background: var(--bg-card);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border-radius: var(--radius);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      box-shadow: var(--shadow-soft);
+      overflow: hidden;
+      min-height: 660px;
+    }
+
+    /* ── Left Hero Visual Panel (Image + Overlay + Branding) ── */
+    .brand-panel {
+      padding: 48px 40px 40px;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+      border-right: 1px solid rgba(255, 255, 255, 0.05);
+      background: #0d0a1a;
+    }
+
+    .hero-bg-wrap {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .hero-bg-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center;
+      opacity: 0.35;
+      filter: contrast(1.15) brightness(0.85);
+      transition: transform 1.2s ease, opacity 0.5s ease;
+    }
+
+    .brand-panel:hover .hero-bg-img {
+      transform: scale(1.04);
+      opacity: 0.42;
+    }
+
+    .hero-bg-overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(150deg, rgba(11, 10, 18, 0.88) 0%, rgba(108, 60, 255, 0.40) 50%, rgba(11, 10, 18, 0.95) 100%);
+      backdrop-filter: blur(2px);
+      -webkit-backdrop-filter: blur(2px);
+    }
+
+    .brand-logo,
+    .hero-content,
+    .brand-features {
+      position: relative;
+      z-index: 2;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 40px;
+    }
+
+    .brand-logo .logo-icon {
+      width: 46px;
+      height: 46px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: #fff;
+      box-shadow: 0 8px 24px rgba(108, 60, 255, 0.35);
+    }
+
+    .brand-logo h1 {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      background: linear-gradient(to right, #f0edff, #c8baff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-content {
+      margin-top: auto;
+      margin-bottom: 28px;
+    }
+
+    .hero-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1.3;
+      letter-spacing: -0.4px;
+      color: #ffffff;
+      margin-bottom: 12px;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    .hero-subtitle {
+      font-size: 14px;
+      line-height: 1.55;
+      color: rgba(240, 237, 255, 0.85);
+      font-weight: 400;
+    }
+
+    .brand-features {
+      display: grid;
+      gap: 14px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .brand-features .feature {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      color: var(--text-secondary);
+      font-size: 13.5px;
+    }
+
+    .brand-features .feature i {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: rgba(108, 60, 255, 0.25);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--secondary);
+      font-size: 13px;
+      flex-shrink: 0;
+      box-shadow: 0 4px 12px rgba(108, 60, 255, 0.2);
+    }
+
+    /* ── Right Form Panel ── */
+    .form-panel {
+      padding: 48px 44px 40px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      position: relative;
+    }
+
+    .form-header {
+      margin-bottom: 24px;
+    }
+
+    .form-header .form-title {
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .form-header .form-subtitle {
+      color: var(--text-secondary);
+      font-size: 14px;
+      margin-top: 6px;
+    }
+
+    .form-header .form-subtitle a {
+      color: var(--secondary);
+      text-decoration: none;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .form-header .form-subtitle a:hover {
+      color: #66e6ff;
+    }
+
+    /* Tabs */
+    .form-tabs {
+      display: flex;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 14px;
+      padding: 4px;
+      margin-bottom: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .form-tabs .tab-btn {
+      flex: 1;
+      padding: 10px 0;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 11px;
+      cursor: pointer;
+      transition: all var(--transition);
+    }
+
+    .form-tabs .tab-btn.active {
+      background: rgba(108, 60, 255, 0.22);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(108, 60, 255, 0.18);
+    }
+
+    /* Auth Forms */
+    .auth-form {
+      display: none;
+      flex-direction: column;
+      gap: 16px;
+      animation: fadeSlide 0.4s ease;
+    }
+
+    .auth-form.active {
+      display: flex;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .form-group label .required {
+      color: #ff6b8a;
+      font-size: 16px;
+    }
+
+    .input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-wrap i {
+      position: absolute;
+      left: 14px;
+      color: var(--text-muted);
+      font-size: 15px;
+      pointer-events: none;
+    }
+
+    .input-wrap input,
+    .input-wrap select {
+      width: 100%;
+      padding: 13px 16px 13px 44px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1.5px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-size: 14px;
+      font-family: inherit;
+      outline: none;
+      appearance: none;
+    }
+
+    .input-wrap input:focus {
+      border-color: var(--border-focus);
+      background: rgba(255, 255, 255, 0.06);
+      box-shadow: 0 0 0 4px rgba(108, 60, 255, 0.10);
+    }
+
+    .input-wrap input::placeholder {
+      color: var(--text-muted);
+      font-size: 13px;
+    }
+
+    .toggle-pwd {
+      position: absolute;
+      right: 14px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 15px;
+      padding: 4px;
+    }
+
+    .toggle-pwd:hover {
+      color: var(--text-secondary);
+    }
+
+    /* Sector Grid (8 Sectors) */
+    .sector-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .sector-option {
+      position: relative;
+    }
+
+    .sector-option input {
+      display: none;
+    }
+
+    .sector-option label {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 10px 6px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1.5px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 500;
+      text-align: center;
+      cursor: pointer;
+      transition: all var(--transition);
+      gap: 6px;
+      min-height: 68px;
+      line-height: 1.2;
+    }
+
+    .sector-option label i {
+      font-size: 18px;
+      color: var(--text-muted);
+      transition: all var(--transition);
+    }
+
+    .sector-option input:checked+label {
+      background: rgba(108, 60, 255, 0.18);
+      border-color: var(--primary);
+      color: #fff;
+      box-shadow: 0 0 0 3px rgba(108, 60, 255, 0.12);
+    }
+
+    .sector-option input:checked+label i {
+      color: var(--secondary);
+    }
+
+    .sector-option label:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(108, 60, 255, 0.30);
+    }
+
+    /* Form Actions & Buttons */
+    .btn-primary {
+      padding: 14px 24px;
+      border: none;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+      color: #fff;
+      font-family: inherit;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      box-shadow: 0 8px 24px rgba(108, 60, 255, 0.25);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 32px rgba(108, 60, 255, 0.35);
+    }
+
+    .form-extra {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .form-extra label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+
+    .form-extra a {
+      color: var(--secondary);
+      text-decoration: none;
+      font-weight: 500;
+      cursor: pointer;
+    }
+
+    .form-message {
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      display: none;
+      margin-top: 4px;
+    }
+
+    .form-message.error {
+      display: block;
+      background: rgba(255, 80, 80, 0.12);
+      color: #ff8080;
+      border: 1px solid rgba(255, 80, 80, 0.2);
+    }
+
+    .form-message.success {
+      display: block;
+      background: rgba(0, 212, 255, 0.1);
+      color: #66e6ff;
+      border: 1px solid rgba(0, 212, 255, 0.2);
+    }
+
+    /* Responsive Auth (Mobile single-column with styled compact banner) */
+    @media (max-width: 1024px) {
+      .auth-wrapper {
+        grid-template-columns: 1fr;
+        max-width: 520px;
+      }
+
+      .brand-panel {
+        padding: 28px 24px 20px;
+        min-height: 180px;
+        border-right: none;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      }
+
+      .hero-bg-img {
+        opacity: 0.3;
+      }
+
+      .hero-content {
+        margin-top: 10px;
+        margin-bottom: 0;
+      }
+
+      .hero-title {
+        font-size: 18px;
+        margin-bottom: 4px;
+      }
+
+      .hero-subtitle {
+        font-size: 12px;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+      }
+
+      .brand-features {
+        display: none;
+      }
+
+      .form-panel {
+        padding: 28px 24px 32px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .sector-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 6px;
+      }
+    }
+
+    /* ── App Shell & Dashboard Styles ── */
+    .panel {
+      background: var(--panel);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: 12px;
+      padding: 22px;
+      box-shadow: var(--shadow-glow);
+    }
+
+    .btn-secondary {
+      padding: 9px 16px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel-alt);
+      color: var(--text);
+      font-weight: 600;
+      font-size: 13.5px;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--primary-light);
+      color: var(--primary-light);
+    }
+
+    .badge {
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11.5px;
+      font-weight: 600;
+      border: 1px solid;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .badge.High {
+      color: var(--critical);
+      border-color: rgba(255, 92, 92, 0.4);
+      background: rgba(255, 92, 92, 0.12);
+    }
+
+    .badge.Medium {
+      color: var(--warn);
+      border-color: rgba(242, 184, 75, 0.4);
+      background: rgba(242, 184, 75, 0.12);
+    }
+
+    .badge.Low {
+      color: var(--safe);
+      border-color: rgba(43, 212, 160, 0.4);
+      background: rgba(43, 212, 160, 0.12);
+    }
+
+    .badge.SENT {
+      color: var(--safe);
+      border-color: rgba(43, 212, 160, 0.4);
+      background: rgba(43, 212, 160, 0.12);
+    }
+
+    .badge.SKIPPED_THROTTLED {
+      color: var(--warn);
+      border-color: rgba(242, 184, 75, 0.4);
+      background: rgba(242, 184, 75, 0.12);
+    }
+
+    .app-shell {
+      display: none;
+      min-height: 100vh;
+    }
+
+    .app-shell.active {
+      display: flex;
+    }
+
+    .sidebar {
+      width: 240px;
+      background: var(--panel-solid);
+      border-right: 1px solid var(--line);
+      display: flex;
+      flex-direction: column;
+      padding: 20px 14px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 0 8px 20px;
+    }
+
+    .sidebar-company {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px;
+      background: var(--panel-alt);
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      margin-bottom: 16px;
+    }
+
+    .company-name {
+      font-size: 13.5px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .company-sector {
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      margin-bottom: 4px;
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      font-size: 13.5px;
+      text-align: left;
+      width: 100%;
+    }
+
+    .nav-item svg,
+    .nav-item i {
+      width: 18px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .nav-item:hover {
+      background: var(--panel-alt);
+      color: var(--text);
+    }
+
+    .nav-item.active {
+      background: var(--signal-glow);
+      color: var(--primary-light);
+      font-weight: 600;
+      border-left: 3px solid var(--primary);
+    }
+
+    .sidebar-spacer {
+      flex: 1;
+    }
+
+    .main {
+      flex: 1;
+      padding: 28px 36px;
+      overflow-y: auto;
+      height: 100vh;
+      background: var(--ink);
+    }
+
+    /* Header Toolbar */
+    .top-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .live-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 20px;
+      background: rgba(43, 212, 160, 0.1);
+      border: 1px solid rgba(43, 212, 160, 0.3);
+      color: var(--safe);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .live-pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--safe);
+      animation: pulseGlow 2s infinite;
+    }
+
+    .theme-toggle-btn {
+      background: var(--panel-alt);
+      border: 1px solid var(--line);
+      color: var(--text);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tab-panel {
+      display: none;
+    }
+
+    .tab-panel.active {
+      display: block;
+    }
+
+    h2.section-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 22px;
+      margin: 0 0 4px;
+    }
+
+    .section-sub {
+      color: var(--text-dim);
+      font-size: 13px;
+      margin: 0 0 20px;
+    }
+
+    /* Stats Grid */
+    .stat-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .stat-card {
+      position: relative;
+      overflow: hidden;
+    }
+
+    .stat-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .stat-value {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 28px;
+      font-weight: 700;
+    }
+
+    .stat-sub {
+      font-size: 12px;
+      color: var(--text-dim);
+      margin-top: 4px;
+    }
+
+    /* Charts Grid */
+    .chart-row {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+
+    .chart-panel {
+      min-height: 260px;
+    }
+
+    .panel-label {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    /* Data Tables */
+    .table-panel {
+      padding: 0 !important;
+      overflow: hidden;
+    }
+
+    .table-header,
+    .table-row {
+      display: grid;
+      grid-template-columns: 1.2fr 0.9fr 0.8fr 0.8fr 1.3fr;
+      padding: 14px 20px;
+      align-items: center;
+      font-size: 13.5px;
+    }
+
+    .table-header {
+      color: var(--text-dim);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-alt);
+    }
+
+    .table-row {
+      border-bottom: 1px solid var(--line);
+      cursor: pointer;
+    }
+
+    .table-row:hover {
+      background: var(--panel-alt);
+    }
+
+    .audit-table-header,
+    .audit-table-row {
+      display: grid;
+      grid-template-columns: 1.4fr 1.6fr 1.2fr 1fr 0.6fr;
+      padding: 14px 20px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .audit-table-header {
+      color: var(--text-dim);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-alt);
+    }
+
+    .audit-table-row {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .notif-table-header,
+    .notif-table-row {
+      display: grid;
+      grid-template-columns: 1.2fr 1fr 1.4fr 1fr 1.2fr 0.8fr;
+      padding: 14px 20px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .notif-table-header {
+      color: var(--text-dim);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-alt);
+    }
+
+    .notif-table-row {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .files-table-header,
+    .files-table-row {
+      display: grid;
+      grid-template-columns: 1.5fr 1.2fr 1.2fr 0.8fr 1.4fr;
+      padding: 14px 20px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .files-table-header {
+      color: var(--text-dim);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-alt);
+    }
+
+    .files-table-row {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .files-table-row:hover {
+      background: var(--panel-alt);
+    }
+
+    .notif-dispatch-header,
+    .notif-dispatch-row {
+      display: grid;
+      grid-template-columns: 0.3fr 0.9fr 1.2fr 1.5fr 1.2fr 1.1fr 1.1fr;
+      padding: 12px 18px;
+      align-items: center;
+      font-size: 13px;
+    }
+
+    .notif-dispatch-header {
+      color: var(--text-dim);
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel-alt);
+    }
+
+    .notif-dispatch-row {
+      border-bottom: 1px solid var(--line);
+    }
+
+    .notif-dispatch-row:hover {
+      background: var(--panel-alt);
+    }
+
+    .pagination-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 20px;
+      border-top: 1px solid var(--line);
+      background: var(--panel-alt);
+    }
+
+    /* Drawer & Modal */
+    .drawer-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      display: none;
+      justify-content: flex-end;
+      z-index: 100;
+    }
+
+    .drawer-overlay.active {
+      display: flex;
+    }
+
+    .drawer {
+      width: 480px;
+      max-width: 90vw;
+      background: var(--panel-solid);
+      height: 100%;
+      overflow-y: auto;
+      padding: 28px;
+      border-left: 1px solid var(--line);
+      animation: slideInRight 0.3s ease;
+    }
+
+    /* AI Assistant Floating Widget */
+    .ai-widget-trigger {
+      position: fixed;
+      bottom: 28px;
+      right: 28px;
+      z-index: 99;
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+      box-shadow: 0 8px 24px rgba(108, 60, 255, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    .ai-widget-trigger:hover {
+      transform: scale(1.08);
+    }
+
+    .ai-chat-window {
+      position: fixed;
+      bottom: 96px;
+      right: 28px;
+      z-index: 100;
+      width: 400px;
+      max-width: 90vw;
+      height: 540px;
+      border-radius: 16px;
+      background: var(--panel-solid);
+      border: 1px solid var(--glass-border);
+      box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      animation: fadeInScale 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .ai-chat-window.active {
+      display: flex;
+    }
+
+    .ai-chat-header {
+      padding: 16px;
+      background: var(--panel-alt);
+      border-bottom: 1px solid var(--line);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .ai-chat-body {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .chat-msg {
+      max-width: 85%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .chat-msg.bot {
+      background: var(--panel-alt);
+      border: 1px solid var(--line);
+      align-self: flex-start;
+    }
+
+    .chat-msg.user {
+      background: var(--primary);
+      color: #fff;
+      align-self: flex-end;
+    }
+
+    .chat-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .chip-btn {
+      background: rgba(108, 60, 255, 0.15);
+      border: 1px solid var(--border-subtle);
+      color: var(--primary-light);
+      border-radius: 16px;
+      padding: 4px 10px;
+      font-size: 11px;
+      cursor: pointer;
+    }
+
+    .chip-btn:hover {
+      background: var(--primary);
+      color: #fff;
+    }
+
+    .ai-chat-footer {
+      padding: 12px;
+      border-top: 1px solid var(--line);
+      display: flex;
+      gap: 8px;
+      background: var(--panel-alt);
+    }
+
+    .ai-chat-footer input {
+      flex: 1;
+      font-size: 13px;
+    }
+
+    .ai-chat-footer button {
+      width: auto;
+      padding: 0 16px;
+      border-radius: 8px;
+      background: var(--primary);
+      color: #fff;
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Decorative Orbs -->
+  <div class="orb orb--1"></div>
+  <div class="orb orb--2"></div>
+
+  <!-- ============ AUTH CONTAINER (LOGIN & REGISTER) ============ -->
+  <div id="screen-auth" class="auth-screen">
+    <div class="auth-wrapper animate-entry">
+
+      <!-- LEFT: Hero Network Visual Panel (Image + Gradient Overlay + Branding) -->
+      <div class="brand-panel">
+        <div class="hero-bg-wrap">
+          <img src="assets/images/social-network-connection-avatar-icon-vector.jpg" alt="Social Network Connection"
+            class="hero-bg-img" />
+          <div class="hero-bg-overlay"></div>
+        </div>
+
+        <div class="brand-logo">
+          <div class="logo-icon"><i class="fas fa-wave-square"></i></div>
+          <h1>ChurnShield</h1>
+        </div>
+
+        <div class="hero-content">
+          <h2 class="hero-title">Connect, Monitor &amp; Retain Your Customers in Real-Time</h2>
+          <p class="hero-subtitle">AI-powered customer risk intelligence and real-time behavioral network tracking
+            across your enterprise.</p>
+        </div>
+
+        <div class="brand-features">
+          <div class="feature">
+            <i class="fas fa-bolt"></i>
+            <span>Real‑time churn signals &amp; alerts</span>
+          </div>
+          <div class="feature">
+            <i class="fas fa-chart-line"></i>
+            <span>Predictive analytics with 94% accuracy</span>
+          </div>
+          <div class="feature">
+            <i class="fas fa-shield-alt"></i>
+            <span>Enterprise‑grade security &amp; compliance</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- RIGHT: Form Panel -->
+      <div class="form-panel">
+
+        <!-- Tabs -->
+        <div class="form-tabs">
+          <button class="tab-btn active" data-tab="login" onclick="switchAuthTab('login')">
+            <i class="fas fa-sign-in-alt" style="margin-right: 8px;"></i> Sign In
+          </button>
+          <button class="tab-btn" data-tab="register" onclick="switchAuthTab('register')">
+            <i class="fas fa-user-plus" style="margin-right: 8px;"></i> Register
+          </button>
+        </div>
+
+        <!-- ─── LOGIN FORM ─── -->
+        <form class="auth-form active" id="loginForm" autocomplete="off"
+          onsubmit="event.preventDefault(); handleLogin();">
+          <div class="form-header">
+            <div class="form-title">Welcome back</div>
+            <div class="form-subtitle">
+              Don't have an account? <a onclick="switchAuthTab('register')">Create one</a>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Email <span class="required">*</span></label>
+            <div class="input-wrap">
+              <i class="fas fa-envelope"></i>
+              <input type="email" id="loginEmail" placeholder="you@company.com" required autocomplete="off" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Password <span class="required">*</span></label>
+            <div class="input-wrap">
+              <i class="fas fa-lock"></i>
+              <input type="password" id="loginPassword" placeholder="••••••••" required minlength="8" autocomplete="new-password" />
+              <button type="button" class="toggle-pwd" aria-label="Toggle password visibility">
+                <i class="fas fa-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-extra">
+            <label>
+              <input type="checkbox" checked /> Remember me
+            </label>
+            <a id="forgotPassword" onclick="handleForgotPassword()">Forgot password?</a>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn-primary" id="login-btn">
+              <i class="fas fa-arrow-right-to-bracket"></i> Sign In
+            </button>
+          </div>
+
+          <div id="loginMessage" class="form-message"></div>
+        </form>
+
+        <!-- ─── REGISTER FORM ─── -->
+        <form class="auth-form" id="registerForm" autocomplete="off"
+          onsubmit="event.preventDefault(); handleRegister();">
+          <div class="form-header">
+            <div class="form-title">Create your account</div>
+            <div class="form-subtitle">
+              Already have one? <a onclick="switchAuthTab('login')">Sign in</a>
+            </div>
+          </div>
+
+          <!-- Company name -->
+          <div class="form-group">
+            <label>Company name <span class="required">*</span></label>
+            <div class="input-wrap">
+              <i class="fas fa-building"></i>
+              <input type="text" id="regCompany" placeholder="e.g. Acme Corporation" required />
+            </div>
+          </div>
+
+          <!-- Sector -->
+          <div class="form-group">
+            <label>Sector <span class="required">*</span></label>
+            <div class="input-wrap">
+              <i class="fas fa-industry"></i>
+              <select id="regSector" required
+                style="width: 100%; border: none; outline: none; background: transparent; padding-left: 8px; color: var(--text-main); font-family: inherit; font-size: 0.9rem;">
+                <option value="ecommerce">E-Commerce</option>
+                <option value="telecom">Telecom</option>
+                <option value="ott">OTT / Streaming</option>
+                <option value="banking">Banking</option>
+                <option value="insurance">Insurance</option>
+                <option value="jobportals">Job Portal</option>
+                <option value="utilities">Utilities</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Email -->
+          <div class="form-group">
+            <label>Company email <span class="required">*</span></label>
+            <div class="input-wrap">
+              <i class="fas fa-envelope"></i>
+              <input type="email" id="regEmail" placeholder="you@company.com" required autocomplete="off" />
+            </div>
+          </div>
+
+          <!-- Password -->
+          <div class="form-group">
+            <label>Password <span class="required">*</span></label>
+            <div class="input-wrap">
+              <i class="fas fa-lock"></i>
+              <input type="password" id="regPassword" placeholder="At least 8 characters" required minlength="8" autocomplete="new-password" />
+              <button type="button" class="toggle-pwd" aria-label="Toggle password visibility">
+                <i class="fas fa-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Confirm password -->
+          <div class="form-group">
+            <label>Confirm password <span class="required">*</span></label>
+            <div class="input-wrap">
+              <i class="fas fa-check-circle"></i>
+              <input type="password" id="regConfirm" placeholder="Re-enter password" required minlength="8" autocomplete="new-password" />
+              <button type="button" class="toggle-pwd" aria-label="Toggle password visibility">
+                <i class="fas fa-eye"></i>
+              </button>
+            </div>
+          </div>
+
+          <!-- Sector -->
+          <div class="form-group">
+            <label>Sector <span class="required">*</span></label>
+            <div class="sector-grid">
+              <div class="sector-option">
+                <input type="radio" name="sector" id="sectorTelecom" value="telecom" />
+                <label for="sectorTelecom"><i class="fas fa-satellite-dish"></i>Telecom</label>
+              </div>
+              <div class="sector-option">
+                <input type="radio" name="sector" id="sectorOTT" value="ott" />
+                <label for="sectorOTT"><i class="fas fa-film"></i>OTT / Streaming</label>
+              </div>
+              <div class="sector-option">
+                <input type="radio" name="sector" id="sectorEcom" value="ecommerce" checked />
+                <label for="sectorEcom"><i class="fas fa-store"></i>E‑Commerce</label>
+              </div>
+              <div class="sector-option">
+                <input type="radio" name="sector" id="sectorBanking" value="banking" />
+                <label for="sectorBanking"><i class="fas fa-university"></i>Banking</label>
+              </div>
+              <div class="sector-option">
+                <input type="radio" name="sector" id="sectorInsurance" value="insurance" />
+                <label for="sectorInsurance"><i class="fas fa-shield"></i>Insurance</label>
+              </div>
+              <div class="sector-option">
+                <input type="radio" name="sector" id="sectorJob" value="jobportals" />
+                <label for="sectorJob"><i class="fas fa-briefcase"></i>Job portals</label>
+              </div>
+              <div class="sector-option">
+                <input type="radio" name="sector" id="sectorUtilities" value="utilities" />
+                <label for="sectorUtilities"><i class="fas fa-bolt"></i>Utilities</label>
+              </div>
+              <div class="sector-option">
+                <input type="radio" name="sector" id="sectorShopping" value="shopping_app" />
+                <label for="sectorShopping"><i class="fas fa-shopping-bag"></i>Shopping App</label>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn-primary">
+              <i class="fas fa-user-plus"></i> Create account
+            </button>
+          </div>
+
+          <div id="registerMessage" class="form-message"></div>
+        </form>
+
+      </div><!-- /form-panel -->
+    </div><!-- /auth-wrapper -->
+  </div>
+
+  <!-- ============ CONNECT DATA ============ -->
+  <div id="screen-connect" class="auth-screen hidden">
+    <div class="auth-wrapper animate-entry"
+      style="max-width:700px;grid-template-columns:1fr;min-height:auto;padding:32px;">
+      <div class="brand-logo" style="margin-bottom:20px;">
+        <div class="logo-icon"><i class="fas fa-wave-square"></i></div>
+        <h1>ChurnShield</h1>
+      </div>
+      <h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;margin-bottom:6px;">Connect Customer Data
+        Pipeline</h2>
+      <p style="color:var(--text-secondary);font-size:14px;margin-bottom:24px;" id="connect-subtext">Upload customer
+        behavioral CSV or launch simulated real-time telemetry stream.</p>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+        <div
+          style="padding:20px;border-radius:14px;border:1px solid var(--border-subtle);background:rgba(255,255,255,0.03);">
+          <h3 style="font-family:'Space Grotesk',sans-serif;font-size:16px;margin-bottom:6px;">Upload Data CSV</h3>
+          <p style="color:var(--text-secondary);font-size:13px;margin-bottom:14px;">Matched to your sector features.</p>
+          <div id="file-drop"
+            style="border:1.5px dashed var(--border-subtle);padding:14px;border-radius:10px;text-align:center;font-size:12px;color:var(--text-muted);margin-bottom:10px;">
+            No file selected</div>
+          <input type="file" id="csv-input" accept=".csv" onchange="handleFileSelect(event)">
+          <button class="link-text" style="font-size:12px;margin-top:10px;display:inline-block;"
+            onclick="downloadTemplate()">Download CSV Template</button>
+        </div>
+        <div
+          style="padding:20px;border-radius:14px;border:1px solid var(--border-subtle);background:rgba(255,255,255,0.03);">
+          <h3 style="font-family:'Space Grotesk',sans-serif;font-size:16px;margin-bottom:6px;">Use Sample Data</h3>
+          <p style="color:var(--text-secondary);font-size:13px;margin-bottom:16px;">Explore realistic customer telemetry
+            and prediction risk scoring immediately.</p>
+          <button class="btn-secondary" style="width:100%;" onclick="connectSampleData()">Use Sample Dataset</button>
+        </div>
+      </div>
+
+      <div class="error-text" id="connect-error"></div>
+      <button class="btn-primary" id="connect-btn" onclick="connectUploadedFile()" disabled>Analyze Uploaded
+        CSV</button>
+    </div>
+  </div>
+
+  <!-- ============ APP SHELL ============ -->
+  <div id="app-shell" class="app-shell">
+    <div class="sidebar">
+      <div class="sidebar-brand">
+        <div class="logo-icon"
+          style="width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--primary),var(--secondary));display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;">
+          <i class="fas fa-wave-square"></i>
+        </div>
+        <span class="brand-name" style="font-size:18px;">ChurnShield</span>
+      </div>
+
+      <div class="sidebar-company">
+        <svg id="sidebar-sector-icon" viewBox="0 0 24 24" width="18" height="18" fill="none"
+          stroke="var(--primary-light)" stroke-width="2"></svg>
+        <div>
+          <div class="company-name" id="sidebar-company-name">—</div>
+          <div class="company-sector" id="sidebar-sector-label">—</div>
+        </div>
+      </div>
+
+      <button class="nav-item active" data-tab="overview" onclick="switchTab('overview')">
+        <i class="fas fa-chart-pie"></i> Dashboard Overview
+      </button>
+      <button class="nav-item" data-tab="customers" onclick="switchTab('customers')">
+        <i class="fas fa-users"></i> Customer Segments
+      </button>
+      <button class="nav-item" data-tab="notifications" onclick="switchTab('notifications')">
+        <i class="fas fa-bell"></i> Alert Notifications
+      </button>
+      <button class="nav-item" data-tab="audit" onclick="switchTab('audit')">
+        <i class="fas fa-user-shield"></i> Audit Logs
+      </button>
+      <button class="nav-item" data-tab="files" onclick="switchTab('files')">
+        <i class="fas fa-folder-open"></i> File Upload History
+      </button>
+      <button class="nav-item" data-tab="reports" onclick="switchTab('reports')">
+        <i class="fas fa-file-invoice"></i> Reports &amp; Export
+      </button>
+
+      <div class="sidebar-spacer"></div>
+
+      <button class="nav-item" onclick="switchToConnectScreen()">
+        <i class="fas fa-upload"></i> Upload New Data
+      </button>
+      <button class="nav-item" onclick="handleLogout()">
+        <i class="fas fa-sign-out-alt"></i> Log Out
+      </button>
+    </div>
+
+    <div class="main">
+      <!-- Top Header Bar -->
+      <div class="top-header">
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span class="live-pill">
+            <span class="live-pulse-dot"></span>
+            REAL-TIME TELEMETRY ACTIVE
+          </span>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:12px;">
+          <button class="theme-toggle-btn" onclick="toggleTheme()">
+            <span id="theme-icon">🌙</span> Dark Mode
+          </button>
+        </div>
+      </div>
+
+      <!-- OVERVIEW TAB -->
+      <div class="tab-panel active animate-entry" id="tab-overview">
+        <h2 class="section-title" id="overview-header-title">Executive Churn Dashboard</h2>
+        <p class="section-sub">Real-time ML risk predictions across customer portfolio.</p>
+        <div class="stat-row" id="stat-row"></div>
+        <div class="chart-row">
+          <div class="panel chart-panel">
+            <div class="panel-label">8-Week Churn Probability Trend</div>
+            <svg id="trendChart" viewBox="0 0 460 200" width="100%" height="200"></svg>
+          </div>
+          <div class="panel chart-panel">
+            <div class="panel-label">Customer Risk Distribution</div>
+            <svg id="riskDonut" viewBox="0 0 200 200" width="100%" height="200"></svg>
+            <div id="donut-legend" style="display:flex;justify-content:space-around;margin-top:8px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CUSTOMER LIST TAB -->
+      <div class="tab-panel animate-entry" id="tab-customers">
+        <h2 class="section-title">Individual Customer Analysis</h2>
+        <p class="section-sub">Search and examine real-time customer risk profiles &amp; AI suggestions.</p>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div style="position:relative;width:340px;">
+            <input id="customer-search" placeholder="Search customer by name or ID..." oninput="renderCustomerList()">
+          </div>
+          <div id="risk-filter-row" style="display:flex;gap:8px;"></div>
+        </div>
+
+        <div class="panel table-panel">
+          <div class="table-header">
+            <span>Customer Name</span><span>Customer ID</span><span>Last Active</span><span>Risk
+              Level</span><span>Action</span>
+          </div>
+          <div id="customer-table-body"></div>
+        </div>
+      </div>
+
+      <!-- NOTIFICATIONS TAB -->
+      <div class="tab-panel animate-entry" id="tab-notifications">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div>
+            <h2 class="section-title">Multi-Channel Notification Dispatcher</h2>
+            <p class="section-sub">Batch audience selection, contact management, and dynamic automated alert delivery.
+            </p>
+          </div>
+
+          <!-- SUB-TAB SWITCHER BUTTONS -->
+          <div
+            style="display:flex;gap:8px;background:var(--panel-alt);padding:4px;border-radius:10px;border:1px solid var(--line);">
+            <button class="btn-secondary notif-subtab-btn active" id="btn-subtab-highrisk"
+              onclick="switchNotifSubTab('highrisk')" style="padding:6px 14px;font-size:12.5px;border:none;">
+              🔥 High-Risk Churn Alerts
+            </button>
+            <button class="btn-secondary notif-subtab-btn" id="btn-subtab-expiry" onclick="switchNotifSubTab('expiry')"
+              style="padding:6px 14px;font-size:12.5px;border:none;">
+              ⏳ Plan Expiry Alerts
+            </button>
+          </div>
+        </div>
+
+        <!-- STICKY SELECTION / BULK ACTION BAR -->
+        <div class="panel"
+          style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;padding:12px 20px;background:var(--panel-alt);border:1px solid var(--primary-glow);">
+          <div style="display:flex;align-items:center;gap:12px;">
+            <span id="selected-notif-count" style="font-weight:600;font-size:13.5px;">
+              <i class="fas fa-check-circle" style="color:var(--text-dim);"></i> 0 customers selected
+            </span>
+            <span style="color:var(--text-dim);font-size:12px;" id="notif-target-scope-text">(Targeting High-Risk Churn
+              Audience)</span>
+          </div>
+          <div style="display:flex;gap:10px;">
+            <button class="btn-secondary" style="padding:6px 12px;font-size:12px;" onclick="clearNotifSelection()">Clear
+              Selection</button>
+            <button class="btn-primary" id="btn-batch-send" disabled
+              style="width:auto;padding:6px 16px;font-size:12.5px;" onclick="openBatchNotifModal()">
+              <i class="fas fa-mail-bulk"></i> Send Batch Notification to Selected
+            </button>
+          </div>
+        </div>
+
+        <!-- CUSTOMER SELECTION DATA TABLE -->
+        <div class="panel table-panel" style="margin-bottom:24px;">
+          <div class="notif-dispatch-header">
+            <span><input type="checkbox" id="notif-select-all" onclick="toggleSelectAllNotifCustomers(this)" /></span>
+            <span>User ID</span>
+            <span>Customer Name</span>
+            <span>Email Address</span>
+            <span>Phone Number</span>
+            <span id="notif-context-col-title">Risk Level</span>
+            <span>Action</span>
+          </div>
+          <div id="notif-dispatch-table-body" style="max-height:420px;overflow-y:auto;"></div>
+        </div>
+
+        <!-- SETTINGS & LOGS DUAL PANEL -->
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:18px;margin-bottom:24px;">
+          <div class="panel">
+            <h3 style="font-family:'Space Grotesk',sans-serif;font-size:16px;margin:0 0 14px;">Alert Settings &amp;
+              Channels</h3>
+
+            <label class="field-label">High Risk Trigger Threshold (%)</label>
+            <input id="notif-threshold" type="number" min="50" max="95" value="75" class="field-gap"
+              onchange="saveNotificationSettingsUI()">
+
+            <label class="field-label">Cooling-off Interval (Hours per customer)</label>
+            <input id="notif-cooldown" type="number" min="1" max="168" value="24" class="field-gap"
+              onchange="saveNotificationSettingsUI()">
+
+            <label class="field-label">Email Recipient</label>
+            <input id="notif-email-recipient" type="email" value="retention-team@company.com" class="field-gap"
+              onchange="saveNotificationSettingsUI()">
+
+            <label class="field-label">SMS Recipient Phone</label>
+            <input id="notif-sms-recipient" type="text" value="+15550192834" class="field-gap"
+              onchange="saveNotificationSettingsUI()">
+
+            <div style="display:flex;gap:12px;margin-top:10px;">
+              <label style="font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="checkbox" id="notif-email-toggle" checked onchange="saveNotificationSettingsUI()"> Email
+                Alerts
+              </label>
+              <label style="font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;">
+                <input type="checkbox" id="notif-sms-toggle" checked onchange="saveNotificationSettingsUI()"> SMS Alerts
+              </label>
+            </div>
+          </div>
+
+          <div class="panel table-panel">
+            <div
+              style="padding:16px;border-bottom:1px solid var(--line);font-weight:600;font-size:14px;display:flex;justify-content:space-between;align-items:center;">
+              <span>Multi-Channel Delivery Log</span>
+              <button class="btn-secondary" style="font-size:11px;padding:4px 10px;"
+                onclick="triggerTestNotificationUI()">Test Dispatcher</button>
+            </div>
+            <div class="notif-table-header">
+              <span>Customer</span><span>Channel</span><span>Recipient</span><span>Status</span><span>Risk
+                Score</span><span>Sent Time</span>
+            </div>
+            <div id="notif-table-body" style="max-height:360px;overflow-y:auto;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AUDIT LOGS TAB -->
+      <div class="tab-panel animate-entry" id="tab-audit">
+        <h2 class="section-title">Comprehensive Audit Logs System</h2>
+        <p class="section-sub">Track administrative actions, system events, and state mutations.</p>
+
+        <div style="display:flex;gap:12px;margin-bottom:16px;">
+          <input id="audit-search" placeholder="Search audit logs..." style="width:280px;" oninput="fetchAuditLogsUI()">
+          <select id="audit-action-filter" style="width:220px;" onchange="fetchAuditLogsUI()">
+            <option value="ALL">All Actions</option>
+            <option value="USER_LOGIN">USER_LOGIN</option>
+            <option value="CUSTOMER_CREATED">CUSTOMER_CREATED</option>
+            <option value="REALTIME_TELEMETRY_UPDATED">REALTIME_TELEMETRY_UPDATED</option>
+            <option value="NOTIFICATION_DISPATCHED">NOTIFICATION_DISPATCHED</option>
+            <option value="NOTIFICATION_THROTTLED">NOTIFICATION_THROTTLED</option>
+            <option value="NOTIFICATION_SETTINGS_UPDATED">NOTIFICATION_SETTINGS_UPDATED</option>
+            <option value="AI_ASSISTANT_QUERIED">AI_ASSISTANT_QUERIED</option>
+          </select>
+        </div>
+
+        <div class="panel table-panel">
+          <div class="audit-table-header">
+            <span>Timestamp</span><span>Action Type</span><span>Actor</span><span>Entity Affected</span><span>State
+              Diff</span>
+          </div>
+          <div id="audit-table-body"></div>
+          <div class="pagination-row">
+            <span style="font-size:12.5px;color:var(--text-dim);" id="audit-page-info">Page 1 of 1</span>
+            <div style="display:flex;gap:6px;">
+              <button class="btn-secondary" style="padding:4px 10px;font-size:12px;"
+                onclick="changeAuditPage(-1)">Previous</button>
+              <button class="btn-secondary" style="padding:4px 10px;font-size:12px;"
+                onclick="changeAuditPage(1)">Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- REPORTS TAB -->
+      <div class="tab-panel animate-entry" id="tab-reports">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h2 class="section-title" style="margin:0;">Executive Reports &amp; Export</h2>
+          <div style="display:flex;gap:8px;">
+            <button class="btn-secondary" onclick="exportCSV()">Export .CSV</button>
+            <button class="btn-secondary" onclick="exportExcel()">Export .XLSX</button>
+            <button class="btn-primary" style="width:auto;" onclick="exportPDF()">Export .PDF Report</button>
+          </div>
+        </div>
+        <div class="panel" style="margin-bottom:16px;">
+          <div class="panel-label" id="reports-title">Weekly Churn Summary</div>
+          <p style="font-size:13.5px;line-height:1.6;margin:0;" id="reports-summary"></p>
+        </div>
+        <div class="panel">
+          <div class="panel-label">Risk Band Breakdown</div>
+          <svg id="riskBar" viewBox="0 0 460 200" width="100%" height="200"></svg>
+        </div>
+      </div>
+
+      <!-- FILE UPLOAD HISTORY TAB -->
+      <div class="tab-panel animate-entry" id="tab-files">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <div>
+            <h2 class="section-title">Uploaded Files History</h2>
+            <p class="section-sub">Inspect and manage customer behavioral datasets, imported CSVs, and telemetry
+              batches.</p>
+          </div>
+          <button class="btn-primary" style="width:auto;" onclick="switchToConnectScreen()">
+            <i class="fas fa-cloud-upload-alt"></i> Upload New Dataset
+          </button>
+        </div>
+
+        <div style="display:flex;gap:12px;margin-bottom:16px;">
+          <input id="files-search" placeholder="Search files by name or uploader..." style="width:300px;"
+            oninput="renderFileUploadHistory()">
+          <select id="files-status-filter" style="width:180px;" onchange="renderFileUploadHistory()">
+            <option value="ALL">All Statuses</option>
+            <option value="Processed">Processed</option>
+            <option value="Processing">Processing</option>
+            <option value="Failed">Failed</option>
+          </select>
+        </div>
+
+        <div class="panel table-panel">
+          <div class="files-table-header">
+            <span>File Name</span><span>Uploaded By</span><span>Timestamp &amp;
+              Size</span><span>Status</span><span>Actions</span>
+          </div>
+          <div id="files-table-body"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DETAIL DRAWER -->
+  <div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer(event)">
+    <div class="drawer" onclick="event.stopPropagation()">
+      <div class="drawer-header">
+        <div>
+          <h2 class="drawer-name" id="drawer-name"></h2>
+          <span class="drawer-id" id="drawer-id"></span>
+        </div>
+        <button class="drawer-close" onclick="closeDrawer()">✕</button>
+      </div>
+
+      <div class="panel" style="margin-bottom:16px;text-align:center;">
+        <svg id="pulse-svg" viewBox="0 0 240 60" width="240" height="60"></svg>
+        <div style="display:flex;align-items:baseline;justify-content:center;gap:6px;margin-top:8px;">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:36px;font-weight:700;" id="gauge-score"></span>
+          <span style="color:var(--text-dim);font-size:13px;">/ 100 Risk Score</span>
+        </div>
+      </div>
+
+      <div style="font-size:12px;color:var(--text-dim);text-transform:uppercase;margin-bottom:8px;">Behavioral Signals
+      </div>
+      <div class="panel" style="margin-bottom:16px;" id="drawer-metrics"></div>
+
+      <div style="font-size:12px;color:var(--text-dim);text-transform:uppercase;margin-bottom:8px;">Why Customer Might
+        Leave</div>
+      <div class="panel" style="margin-bottom:16px;" id="drawer-reasons"></div>
+
+      <div style="font-size:12px;color:var(--text-dim);text-transform:uppercase;margin-bottom:8px;">AI Strategic
+        Retention Actions</div>
+      <div class="panel" id="drawer-suggestions"></div>
+    </div>
+  </div>
+
+  <!-- STATE DIFF MODAL -->
+  <div class="drawer-overlay" id="diff-modal-overlay" onclick="closeDiffModal(event)">
+    <div class="drawer" style="width:520px;" onclick="event.stopPropagation()">
+      <div class="drawer-header">
+        <div>
+          <h2 class="drawer-name">Audit Log State Diff</h2>
+          <span class="drawer-id" id="diff-action-id"></span>
+        </div>
+        <button class="drawer-close" onclick="closeDiffModal()">✕</button>
+      </div>
+      <div class="panel" style="margin-bottom:14px;background:var(--panel-alt);">
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">Previous State:</div>
+        <pre id="diff-prev-json"
+          style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--critical);overflow-x:auto;margin:0;"></pre>
+      </div>
+      <div class="panel" style="background:var(--panel-alt);">
+        <div style="font-size:12px;color:var(--text-dim);margin-bottom:6px;">New State:</div>
+        <pre id="diff-new-json"
+          style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--safe);overflow-x:auto;margin:0;"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- MANUAL NOTIFICATION MODAL -->
+  <div class="drawer-overlay" id="send-notif-modal-overlay" onclick="closeSendNotifModal(event)">
+    <div class="drawer" style="width:540px;" onclick="event.stopPropagation()">
+      <div class="drawer-header">
+        <div>
+          <h2 class="drawer-name" id="notif-modal-title">Send Customer Notification</h2>
+          <span class="drawer-id" id="notif-modal-subtitle"></span>
+        </div>
+        <button class="drawer-close" onclick="closeSendNotifModal()">✕</button>
+      </div>
+
+      <form id="manualNotifForm" onsubmit="event.preventDefault(); submitManualNotification();">
+        <!-- Pre-built Retention Templates -->
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>Pre-built Retention Template</label>
+          <select id="notif-template-select" onchange="applyNotifTemplateUI(this.value)">
+            <option value="custom">-- Custom Message --</option>
+            <option value="winback_15">15% Win-Back Discount Offer</option>
+            <option value="expiry_reminder">Plan Renewal &amp; Expiry Reminder</option>
+            <option value="reengage_miss_you">We Miss You Re-engagement Email</option>
+            <option value="vip_outreach">VIP Priority Retention Outreach</option>
+          </select>
+        </div>
+
+        <!-- Delivery Channels -->
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>Delivery Channels <span class="required">*</span></label>
+          <div style="display:flex;gap:16px;margin-top:4px;">
+            <label style="font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="notif-channel-email" checked /> Email
+            </label>
+            <label style="font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="notif-channel-sms" checked /> SMS
+            </label>
+            <label style="font-size:13px;display:flex;align-items:center;gap:6px;cursor:pointer;">
+              <input type="checkbox" id="notif-channel-whatsapp" /> WhatsApp
+            </label>
+          </div>
+        </div>
+
+        <!-- Subject Line -->
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>Subject Line / Header <span class="required">*</span></label>
+          <input type="text" id="notif-subject-input" placeholder="e.g. Exclusive 15% offer for {{name}}" required />
+        </div>
+
+        <!-- Message Body with Tokens -->
+        <div class="form-group" style="margin-bottom:14px;">
+          <label>Message Body <span class="required">*</span> <span
+              style="font-size:11px;color:var(--text-dim);">(Tokens: {{name}}, {{expiry_date}}, {{plan_name}},
+              {{discount_code}})</span></label>
+          <textarea id="notif-body-input" rows="5" placeholder="Write your retention message body..." required
+            style="width:100%;padding:12px;border-radius:10px;background:var(--panel-alt);border:1px solid var(--line);color:var(--text);font-family:inherit;font-size:13px;resize:vertical;"></textarea>
+        </div>
+
+        <div id="notif-send-message" class="form-message"></div>
+
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:20px;">
+          <button type="button" class="btn-secondary" onclick="closeSendNotifModal()">Cancel</button>
+          <button type="submit" class="btn-primary" id="send-notif-submit-btn" style="width:auto;">
+            <i class="fas fa-paper-plane"></i> Send Alert
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ADMIN AI STRATEGIC ASSISTANT CHATBOT -->
+  <div class="ai-widget-trigger" onclick="toggleAIChatWindow()" title="Open Admin AI Strategic Assistant">
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 2a10 10 0 0 1 10 10c0 5.523-4.477 10-10 10S2 17.523 2 12A10 10 0 0 1 12 2z" />
+      <path d="M8 12h8" />
+      <path d="M12 8v8" />
+    </svg>
+  </div>
+
+  <div class="ai-chat-window" id="ai-chat-window">
+    <div class="ai-chat-header">
+      <div class="ai-chat-title">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--primary-light)" stroke-width="2">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+        </svg>
+        Admin AI Strategic Assistant
+      </div>
+      <button style="background:none;border:none;color:var(--text-dim);cursor:pointer;"
+        onclick="toggleAIChatWindow()">✕</button>
+    </div>
+    <div class="ai-chat-body" id="ai-chat-body">
+      <div class="chat-msg bot">
+        👋 Hello! I am your <strong>ChurnShield AI Strategic Assistant</strong>. I have real-time access to your
+        customer churn dataset and system audit logs.<br><br>
+        Ask me anything about your churn metrics or retention strategy!
+        <div class="chat-chips">
+          <button class="chip-btn" onclick="sendQuickAIChat('How many customers are currently at risk of churn?')">How
+            many at risk?</button>
+          <button class="chip-btn"
+            onclick="sendQuickAIChat('Show me a summary of the top reasons customers are churning this month.')">Top
+            churn reasons</button>
+          <button class="chip-btn"
+            onclick="sendQuickAIChat('What specific actions can we take to stop Customer X from leaving?')">Retention
+            strategy</button>
+        </div>
+      </div>
+    </div>
+    <div class="ai-chat-footer">
+      <input id="ai-chat-input" placeholder="Type a strategic question..." onkeypress="handleAIChatKeypress(event)">
+      <button onclick="submitAIChatMessage()">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const COLORS = { critical: '#FF5C5C', warn: '#F2B84B', safe: '#2BD4A0', signal: '#6c3cff', line: '#232A38', textDim: '#8B93A7' };
+
+    const SECTOR_CONFIG = {
+      ecommerce: { label: 'E-Commerce', icon: '<path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>' },
+      shopping_app: { label: 'Shopping App', icon: '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>' },
+      ott: { label: 'OTT / Streaming', icon: '<rect x="2" y="7" width="20" height="15" rx="2"/><polyline points="17 2 12 7 7 2"/>' },
+      telecom: { label: 'Telecom', icon: '<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3"/>' },
+      banking: { label: 'Banking', icon: '<rect x="2" y="10" width="20" height="10" rx="1"/><path d="M12 2 2 8h20z"/>' },
+      insurance: { label: 'Insurance', icon: '<path d="M12 2 3 6v6c0 5 3.8 9.4 9 10 5.2-.6 9-5 9-10V6z"/>' },
+      jobportals: { label: 'Job Portals', icon: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>' },
+      utilities: { label: 'Utilities', icon: '<path d="M13 2 3 14h9l-1 8 10-12h-9z"/>' }
+    };
+
+    let state = {
+      company: { name: '', sector: 'ecommerce', email: '' },
+      customers: [],
+      auditLogs: [],
+      notifications: [],
+      fileUploads: [],
+      notificationSettings: { high_risk_threshold: 75, cooling_off_hours: 24, email_enabled: true, sms_enabled: true, email_recipient: 'retention-team@company.com', sms_recipient: '+15550192834' },
+      tab: 'overview',
+      customerFilter: 'All',
+      ws: null
+    };
+
+    // Helper: Derive Dynamic Company Title from email domain if missing
+    function deriveCompanyNameFromEmail(email, defaultName = '') {
+      if (defaultName && defaultName.trim()) {
+        return defaultName.trim();
+      }
+      if (!email || !email.includes('@')) {
+        return 'My Enterprise';
+      }
+      const parts = email.split('@');
+      const domain = parts[1].split('.')[0];
+      const publicDomains = ['gmail', 'yahoo', 'hotmail', 'outlook', 'icloud', 'mail', 'protonmail', 'zoho'];
+
+      if (publicDomains.includes(domain.toLowerCase())) {
+        const userPart = parts[0].replace(/[._-]/g, ' ');
+        return userPart.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') + ' Org';
+      }
+
+      return domain.charAt(0).toUpperCase() + domain.slice(1);
+    }
+
+    // Helper: Smart Sector Detector
+    function deriveSectorFromCompanyOrEmail(email = '', companyName = '') {
+      const combined = (email + ' ' + companyName).toLowerCase();
+      if (combined.includes('netflix') || combined.includes('stream') || combined.includes('ott') || combined.includes('hulu') || combined.includes('disney')) {
+        return 'ott';
+      }
+      if (combined.includes('telecom') || combined.includes('verizon') || combined.includes('vodafone') || combined.includes('airtel') || combined.includes('tmobile')) {
+        return 'telecom';
+      }
+      if (combined.includes('bank') || combined.includes('globalcorp') || combined.includes('chase') || combined.includes('citi') || combined.includes('fintech')) {
+        return 'banking';
+      }
+      if (combined.includes('insurance') || combined.includes('insure') || combined.includes('geico')) {
+        return 'insurance';
+      }
+      if (combined.includes('job') || combined.includes('career') || combined.includes('portal') || combined.includes('linkedin')) {
+        return 'jobportals';
+      }
+      if (combined.includes('utility') || combined.includes('power') || combined.includes('electric') || combined.includes('energy')) {
+        return 'utilities';
+      }
+      if (combined.includes('shop') || combined.includes('app')) {
+        return 'shopping_app';
+      }
+      return 'ecommerce';
+    }
+
+    // Toggle Password Visibility
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.toggle-pwd').forEach(btn => {
+        btn.addEventListener('click', function () {
+          const input = this.closest('.input-wrap').querySelector('input');
+          if (!input) return;
+          const isPassword = input.type === 'password';
+          input.type = isPassword ? 'text' : 'password';
+          this.querySelector('i').className = isPassword ? 'fas fa-eye-slash' : 'fas fa-eye';
+        });
+      });
+    });
+
+    // Helper: show message in auth forms
+    function showMessage(el, text, type = 'error') {
+      if (!el) return;
+      el.textContent = text;
+      el.className = 'form-message ' + type;
+      clearTimeout(el._hideTimer);
+      el._hideTimer = setTimeout(() => {
+        el.className = 'form-message';
+        el.textContent = '';
+      }, 6000);
+    }
+
+    // Auth Tab Switcher
+    function switchAuthTab(tabId) {
+      document.querySelectorAll('.form-tabs .tab-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.tab === tabId);
+      });
+      const loginForm = document.getElementById('loginForm');
+      const registerForm = document.getElementById('registerForm');
+      if (tabId === 'login') {
+        loginForm.classList.add('active');
+        registerForm.classList.remove('active');
+      } else {
+        registerForm.classList.add('active');
+        loginForm.classList.remove('active');
+      }
+    }
+
+    function handleForgotPassword() {
+      const email = document.getElementById('loginEmail')?.value.trim();
+      const loginMsg = document.getElementById('loginMessage');
+      if (!email) {
+        showMessage(loginMsg, 'Please enter your email address first.', 'error');
+        return;
+      }
+      showMessage(loginMsg, `📧 Password reset link sent to ${email} (demo).`, 'success');
+    }
+
+    function toggleTheme() {
+      const html = document.documentElement;
+      const current = html.getAttribute('data-theme');
+      const next = current === 'light' ? 'dark' : 'light';
+      html.setAttribute('data-theme', next);
+      document.getElementById('theme-icon').textContent = next === 'light' ? '☀️' : '🌙';
+    }
+
+    // Generate Initial Realistic Sample Customers
+    function generateSampleCustomers(sector = 'ecommerce', n = 28) {
+      const names = ["Aarav Sharma", "Meera Verma", "Rohan Iyer", "Isha Khan", "Kabir Reddy", "Ananya Nair", "Vikram Kapoor", "Priya Gupta", "Dev Joshi", "Sana Bhatt", "Nikhil Rao", "Tara Singh", "Yusuf Menon", "Diya Chatterjee"];
+      const plans = ["Enterprise Pro", "Standard Tier", "VIP Platinum", "Annual Saver"];
+      const customers = [];
+
+      for (let i = 0; i < n; i++) {
+        const name = names[i % names.length] + (i >= names.length ? ` ${i + 1}` : "");
+        const risk = Math.round(15 + Math.random() * 80);
+        const band = risk > 70 ? 'High' : risk > 40 ? 'Medium' : 'Low';
+        const expiryDays = Math.floor(3 + Math.random() * 27);
+        const email = `${name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@company.com`;
+        const phone = `+1 (555) 01${(10 + i) % 90}-${1000 + (i * 137) % 9000}`;
+        const planName = plans[i % plans.length];
+        const expiryDate = `2026-08-${String(10 + (i % 20)).padStart(2, '0')}`;
+
+        customers.push({
+          id: `${sector.slice(0, 2).toUpperCase()}-${1000 + i}`,
+          name: name,
+          email: email,
+          phone: phone,
+          planName: planName,
+          expiryDays: expiryDays,
+          expiryDate: expiryDate,
+          lastActive: `${Math.floor(Math.random() * 12) + 1}d ago`,
+          risk: risk,
+          band: band,
+          metrics: { "Cart Abandonment Rate": `${Math.round(20 + risk * 0.7)}%`, "Days Since Purchase": `${Math.round(2 + risk * 0.8)}d`, "Promo Email Open Rate": `${Math.max(2, Math.round(50 - risk * 0.4))}%` },
+          reasons: risk > 70 ? ["Cart abandonment rate rose sharply over 3 sessions", "No purchase in 40+ days after frequent orders"] : ["Order frequency stable"],
+          suggestions: risk > 70 ? ["Send personalized 20% win-back discount", "Trigger cart recovery email within 2h"] : ["Maintain regular engagement cadence"]
+        });
+      }
+      return customers.sort((a, b) => b.risk - a.risk);
+    }
+
+    // Startup Initialization
+    (function init() {
+      state.company = { name: '', sector: 'ecommerce', email: '' };
+      state.customers = [];
+      initWebSocket();
+    })();
+
+
+    function showScreen(name) {
+      document.getElementById('screen-auth').classList.toggle('hidden', name === 'dashboard' || name === 'connect');
+      document.getElementById('screen-connect').classList.toggle('hidden', name !== 'connect');
+      document.getElementById('app-shell').classList.toggle('active', name === 'dashboard');
+    }
+
+    async function handleRegister() {
+      const companyName = document.getElementById('regCompany').value.trim();
+      const sector = document.getElementById('regSector').value;
+      const email = document.getElementById('regEmail').value.trim();
+      const password = document.getElementById('regPassword').value;
+      const regMsg = document.getElementById('registerMessage');
+
+      if (!companyName || !email || !password) {
+        showMessage(regMsg, 'Please fill in all fields.', 'error');
+        return;
+      }
+
+      const regBtn = document.querySelector('#registerForm button[type="submit"], #registerForm .btn-primary');
+      if (regBtn) { regBtn.disabled = true; regBtn.textContent = 'Registering…'; }
+
+      try {
+        const res = await fetch('/auth/register', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            company_name: companyName,
+            sector: sector,
+            email: email,
+            password: password
+          })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          showMessage(regMsg, `✅ Registration successful! Please log in to continue.`, 'success');
+
+          setTimeout(() => {
+            switchAuthTab('login');
+            const loginEmailEl = document.getElementById('loginEmail');
+            if (loginEmailEl) loginEmailEl.value = '';
+            const loginPwdEl = document.getElementById('loginPassword');
+            if (loginPwdEl) loginPwdEl.value = '';
+          }, 1500);
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = errData.detail || 'Registration failed. Please try again.';
+          showMessage(regMsg, `❌ ${errMsg}`, 'error');
+        }
+      } catch (e) {
+        showMessage(regMsg, '⚠️ Unable to reach the authentication server. Please ensure the backend is running.', 'error');
+      }
+
+      if (regBtn) { regBtn.disabled = false; regBtn.textContent = 'Create Account'; }
+    }
+
+
+    async function handleLogin() {
+      const email = document.getElementById('loginEmail').value.trim();
+      const password = document.getElementById('loginPassword').value;
+      const loginMsg = document.getElementById('loginMessage');
+
+      if (!email || !password) {
+        showMessage(loginMsg, 'Please enter your email and password.', 'error');
+        return;
+      }
+
+      const lowerEmail = email.toLowerCase();
+
+      // ── Step 1: Validate against the backend ─
+      const loginBtn = document.querySelector('#loginForm button[type="submit"], #loginForm .btn-primary');
+      if (loginBtn) { loginBtn.disabled = true; loginBtn.textContent = 'Authenticating…'; }
+
+      let resolvedCompanyName = '';
+      let sector = '';
+      let loginSuccess = false;
+
+      try {
+        const res = await fetch('/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, password: password })
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          resolvedCompanyName = data.company_name;
+          sector = data.sector;
+          if (data.access_token) localStorage.setItem('vitals_jwt_token', data.access_token);
+          loginSuccess = true;
+        } else {
+          // Backend returned 401 — wrong password
+          const errData = await res.json().catch(() => ({}));
+          showMessage(loginMsg, `Invalid credentials.`, 'error');
+        }
+      } catch (e) {
+        // Backend unreachable — fall back to authorized list metadata only
+        // Password cannot be verified offline, show error
+        showMessage(loginMsg, '⚠️ Unable to reach the authentication server. Please ensure the backend is running.', 'error');
+      }
+
+      if (loginBtn) { loginBtn.disabled = false; loginBtn.textContent = 'Sign In'; }
+
+      if (!loginSuccess) return;
+
+      // ── Step 3: Load dashboard ─────────────────────────────────────────────
+      state.company = { name: resolvedCompanyName, sector: sector, email: email };
+      addAuditLogEntry('USER_LOGIN', email, {}, { timestamp: new Date().toISOString(), company_name: resolvedCompanyName });
+      showMessage(loginMsg, `✅ Welcome back! Loading dashboard for ${resolvedCompanyName}…`, 'success');
+
+      setTimeout(() => {
+        initDashboard();
+        showScreen('dashboard');
+      }, 600);
+    }
+
+    function handleLogout() {
+      addAuditLogEntry('USER_LOGOUT', state.company.email, {}, {});
+      state.company = { name: '', sector: 'ecommerce', email: '' };
+      document.getElementById('sidebar-company-name').textContent = '—';
+      document.getElementById('sidebar-sector-label').textContent = '—';
+      
+      localStorage.removeItem('vitals_jwt_token');
+      document.getElementById('loginEmail').value = '';
+      document.getElementById('loginPassword').value = '';
+      document.getElementById('loginMessage').innerHTML = '';
+      document.getElementById('registerEmail').value = '';
+      document.getElementById('registerPassword').value = '';
+      
+      showScreen('auth');
+      switchAuthTab('login');
+    }
+
+    function parseCSVTextToCustomers(text, sector = 'ecommerce') {
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+      if (lines.length < 2) return [];
+
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase().replace(/^["']|["']$/g, ''));
+      const customers = [];
+
+      const fc = (keys) => headers.findIndex(h => keys.some(k => h.includes(k)));
+
+      // Identity columns
+      const nameIdx = fc(['name', 'customer_name', 'user_name', 'username', 'client']);
+      const refIdx = fc(['ref', 'customer_id', 'user_id', 'client_id', 'id', 'code']);
+      const emailIdx = fc(['email', 'mail', 'email_address']);
+      const phoneIdx = fc(['phone', 'mobile', 'contact', 'telephone']);
+      const planIdx = fc(['plan', 'tier', 'subscription_tier', 'package', 'plan_name']);
+
+      // Pre-computed risk columns (if dataset already has scores)
+      const targetRiskIdx = fc(['churn_risk', 'risk_score', 'churn_probability', 'churn_score']);
+      const targetLabelIdx = fc(['churn', 'is_churn', 'churned', 'label', 'target', 'exited']);
+
+      // === SHARED COLUMNS ===
+      const daysInactiveIdx = fc(['days_inactive', 'days_since_login', 'last_active_days', 'inactivity', 'days_since_last_purchase', 'days_since_last_order', 'days_since']);
+      const ticketsIdx = fc(['ticket', 'complaint', 'support_case', 'service_call', 'issue']);
+      const tenureIdx = fc(['tenure', 'contract', 'subscription_length', 'customer_since', 'months_with_operator']);
+      const paymentDelayIdx = fc(['payment_delay', 'overdue', 'late_payment', 'billing_delay', 'days_overdue']);
+
+      // === TELECOM COLUMNS ===
+      const dropCallIdx = fc(['call_drop', 'dropped_call', 'drop_rate', 'failed_call']);
+      const dataUsageIdx = fc(['data_usage', 'data_consumed', 'gb_used', 'data_gb']);
+      const rechargeIdx = fc(['recharge', 'days_since_recharge', 'last_recharge']);
+      const planDownIdx = fc(['plan_downgrade', 'downgrade', 'plan_change']);
+      const contractTypeIdx = fc(['contract_type', 'postpaid', 'prepaid', 'plan_type']);
+      const deviceAgeIdx = fc(['device_age', 'handset_age', 'phone_age']);
+      const familyPlanIdx = fc(['family_plan', 'group_plan', 'plan_members', 'family_members']);
+
+      // === OTT COLUMNS ===
+      const watchTimeIdx = fc(['watch_time', 'stream_time', 'hours_watched', 'view_time', 'viewing_hours']);
+      const bufferIdx = fc(['buffer', 'buffering', 'latency', 'playback_error', 'stream_error']);
+      const genreIdx = fc(['genre', 'genres_explored', 'content_diversity']);
+      const completionIdx = fc(['completion', 'series_completion', 'content_completion']);
+      const profilesIdx = fc(['profiles', 'active_profiles', 'family_profiles', 'num_profiles']);
+      const deviceDivIdx = fc(['device_diversity', 'devices_used', 'num_devices', 'device_count']);
+      const exclusiveIdx = fc(['exclusive', 'original_content', 'exclusive_consumption']);
+      const compSubIdx = fc(['competing_subscription', 'other_subscriptions', 'competitor_sub']);
+
+      // === E-COMMERCE COLUMNS ===
+      const cartAbandonIdx = fc(['cart_abandon', 'abandonment', 'cart_rate', 'abandon_rate']);
+      const returnRateIdx = fc(['return_rate', 'refund_rate', 'return_ratio', 'returns']);
+      const deliveryDelayIdx = fc(['delivery_delay', 'shipping_delay', 'late_delivery', 'delivery_complaint']);
+      const wishlistIdx = fc(['wishlist', 'wishlist_activity', 'wishlist_items']);
+      const couponDepIdx = fc(['coupon', 'discount_dependency', 'promo_only', 'coupon_usage']);
+      const loyaltyPtsIdx = fc(['loyalty_points', 'reward_points', 'points_balance']);
+
+      // === BANKING COLUMNS ===
+      const balanceIdx = fc(['balance', 'account_balance', 'deposit', 'avg_balance']);
+      const txFreqIdx = fc(['transaction_frequency', 'tx_count', 'transactions', 'monthly_tx']);
+      const productsIdx = fc(['products_held', 'num_products', 'product_count', 'accounts_held']);
+      const overdraftIdx = fc(['overdraft', 'late_emi', 'emi_delay', 'overdraft_count']);
+      const salaryRedirIdx = fc(['salary_redirect', 'deposit_redirect', 'salary_bank_change']);
+      const ccUtilIdx = fc(['credit_util', 'cc_utilization', 'credit_card_usage']);
+
+      // === INSURANCE COLUMNS ===
+      const premiumDelayIdx = fc(['premium_delay', 'premium_overdue', 'policy_payment_delay']);
+      const claimRejIdx = fc(['claim_reject', 'claims_rejected', 'rejected_claims']);
+      const renewalIdx = fc(['renewal_pending', 'renewal_due', 'policy_renewal']);
+      const settlementIdx = fc(['settlement_time', 'claim_settlement', 'settlement_days']);
+      const premIncIdx = fc(['premium_increase', 'rate_hike', 'renewal_premium_change']);
+
+      // === JOB PORTAL COLUMNS ===
+      const applicationsIdx = fc(['applications_sent', 'jobs_applied', 'apply_count', 'applications']);
+      const profilePctIdx = fc(['profile_completeness', 'profile_complete', 'profile_pct']);
+      const recruiterRespIdx = fc(['recruiter_response', 'response_rate', 'recruiter_reply']);
+      const resumeUpdateIdx = fc(['resume_update', 'cv_update', 'last_resume_update']);
+      const interviewRatioIdx = fc(['interview_ratio', 'interview_rate', 'callback_rate']);
+
+      // === UTILITIES COLUMNS ===
+      const billDelayIdx = fc(['bill_delay', 'bill_payment_delay', 'utility_overdue']);
+      const usageTrendIdx = fc(['usage_trend', 'consumption_trend', 'energy_trend']);
+      const outageIdx = fc(['outage', 'outage_frequency', 'outage_hours', 'service_outage']);
+      const autoPay = fc(['auto_pay', 'autopay', 'auto_payment_enabled']);
+      const solarIdx = fc(['solar', 'alternative_energy', 'solar_adoption']);
+
+      const defaultPlans = ["Enterprise Pro", "Standard Tier", "VIP Platinum", "Annual Saver"];
+
+      const getNum = (idx, def, scaleMin = null, scaleMax = null) => {
+        if (idx < 0) return def;
+        const v = parseFloat(cols[idx]);
+        if (isNaN(v)) return def;
+        if (scaleMin !== null && scaleMax !== null) return Math.min(scaleMax, Math.max(scaleMin, v));
+        return v;
+      };
+
+      // Seeded deterministic variance per customer so each row gets a unique spread
+      const customerHash = (str) => {
+        let h = 0;
+        for (let c = 0; c < str.length; c++) { h = (h << 5) - h + str.charCodeAt(c); h |= 0; }
+        return h;
+      };
+
+      let cols = []; // hoisted for getNum closure
+
+      for (let i = 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (!line) continue;
+        cols = line.split(',').map(c => c.trim().replace(/^["']|["']$/g, ''));
+        if (cols.length === 0 || !cols[0]) continue;
+
+        const name = (nameIdx >= 0 && cols[nameIdx]) ? cols[nameIdx] : `Customer ${i}`;
+        const refId = (refIdx >= 0 && cols[refIdx]) ? cols[refIdx] : `${sector.slice(0, 2).toUpperCase()}-${1000 + i}`;
+        const email = (emailIdx >= 0 && cols[emailIdx]) ? cols[emailIdx] : `${name.toLowerCase().replace(/[^a-z0-9]/g, '.')}@company.com`;
+        const phone = (phoneIdx >= 0 && cols[phoneIdx]) ? cols[phoneIdx] : `+1 (555) 01${(10 + i) % 90}-${1000 + (i * 137) % 9000}`;
+        const planName = (planIdx >= 0 && cols[planIdx]) ? cols[planIdx] : defaultPlans[i % defaultPlans.length];
+
+        let risk = 0;
+
+        // --- If dataset already has risk/label columns, use them directly ---
+        if (targetRiskIdx >= 0 && !isNaN(parseFloat(cols[targetRiskIdx]))) {
+          const v = parseFloat(cols[targetRiskIdx]);
+          risk = v <= 1 ? Math.round(v * 100) : Math.round(v);
+        } else if (targetLabelIdx >= 0 && !isNaN(parseFloat(cols[targetLabelIdx]))) {
+          const v = parseFloat(cols[targetLabelIdx]);
+          risk = v === 1 ? Math.round(75 + Math.random() * 20) : Math.round(12 + Math.random() * 28);
+        } else {
+
+          // ====================================================================
+          // SECTOR-SMART MULTI-FACTOR CHURN SCORE ENGINE
+          // Base score = 25; each negative signal adds weighted points (0–100)
+          // ====================================================================
+          let score = 25;
+
+          if (sector === 'telecom') {
+            // --- TELECOM FACTORS ---
+            const dropRate = getNum(dropCallIdx, (i * 7) % 8, 0, 15);
+            const dataUsage = getNum(dataUsageIdx, 8 + (i * 3) % 20, 0, 50);
+            const complaints = getNum(ticketsIdx, i % 5, 0, 20);
+            const daysSince = getNum(rechargeIdx, 5 + (i * 9) % 30, 0, 60);
+            const downgrade = getNum(planDownIdx, i % 2, 0, 1);
+            const tenure = getNum(tenureIdx, 12 + (i * 5) % 36, 0, 120);
+            const deviceAge = getNum(deviceAgeIdx, 2 + i % 4, 0, 10);
+            const familySize = getNum(familyPlanIdx, 1 + i % 4, 1, 8);
+            const prepaid = contractTypeIdx >= 0 ? (cols[contractTypeIdx] || '').toLowerCase().includes('prepaid') : (i % 3 === 0);
+
+            if (dropRate >= 5) score += 20; else if (dropRate >= 2) score += 10;
+            if (dataUsage < 3) score += 15; // very low data → disengaged
+            if (complaints >= 3) score += 20; else if (complaints >= 1) score += 8;
+            if (daysSince > 20) score += 18; else if (daysSince > 10) score += 8;
+            if (downgrade >= 1) score += 15; // plan downgrade = strong signal
+            if (tenure < 6) score += 12; // honeymoon churn
+            else if (tenure > 48) score += 5;  // long-tenured but stagnant
+            if (deviceAge > 5) score += 8;  // likely to switch at upgrade
+            if (familySize <= 1) score += 5;  // single – easier to churn
+            if (prepaid) score += 8;  // prepaid churns easier
+
+          } else if (sector === 'ott') {
+            // --- OTT / STREAMING FACTORS ---
+            const watchHrs = getNum(watchTimeIdx, 12 + (i * 17) % 30, 0, 80);
+            const buffers = getNum(bufferIdx, i % 7, 0, 20);
+            const daysInact = getNum(daysInactiveIdx, 5 + (i * 11) % 30, 0, 90);
+            const genreDiv = getNum(genreIdx, 3 + i % 5, 1, 10);
+            const completion = getNum(completionIdx, 30 + (i * 13) % 60, 0, 100); // %
+            const profiles = getNum(profilesIdx, 1 + i % 4, 1, 6);
+            const devices = getNum(deviceDivIdx, 1 + i % 4, 1, 6);
+            const exclusive = getNum(exclusiveIdx, i % 2, 0, 1);  // bool
+            const compSubs = getNum(compSubIdx, i % 3, 0, 5);
+
+            if (watchHrs < 3) score += 25; else if (watchHrs < 10) score += 12;
+            if (buffers > 5) score += 18; else if (buffers > 2) score += 8;
+            if (daysInact > 25) score += 22; else if (daysInact > 12) score += 10;
+            if (genreDiv <= 1) score += 8;  // not exploring → bored
+            if (completion < 30) score += 12; // abandons series
+            if (profiles >= 3) score -= 8;  // family sharing → stickier (negative churn signal)
+            if (devices >= 3) score -= 6;  // multi-device → stickier
+            if (exclusive >= 1) score -= 10; // exclusive content watcher → loyal
+            if (compSubs >= 2) score += 10; // subscription fatigue / likely to cut
+
+          } else if (sector === 'ecommerce') {
+            // --- E-COMMERCE FACTORS ---
+            const abandon = getNum(cartAbandonIdx, 0.3 + (i * 17) % 60 / 100, 0, 1);
+            const daysSince2 = getNum(daysInactiveIdx, 10 + (i * 11) % 50, 0, 180);
+            const returnRate = getNum(returnRateIdx, (i * 13) % 40 / 100, 0, 1);
+            const delayComp = getNum(deliveryDelayIdx, i % 3, 0, 10);
+            const wishlist = getNum(wishlistIdx, 3 + (i * 7) % 20, 0, 50);
+            const couponDep = getNum(couponDepIdx, i % 2, 0, 1);  // bool
+            const loyalty = getNum(loyaltyPtsIdx, (i * 53) % 5000, 0, 10000);
+            const tickets2 = getNum(ticketsIdx, i % 4, 0, 15);
+
+            if (abandon > 0.6) score += 22; else if (abandon > 0.35) score += 10;
+            if (daysSince2 > 45) score += 20; else if (daysSince2 > 20) score += 9;
+            if (returnRate > 0.3) score += 15; // high returns → friction / dissatisfied
+            if (delayComp >= 2) score += 12; // delivery complaints
+            if (wishlist > 10 && daysSince2 > 20) score += 8; // wishlisting but not buying
+            if (couponDep >= 1) score += 10; // price-sensitive, churns if no deal
+            if (loyalty < 100) score += 6;  // uninvested in loyalty program
+            if (tickets2 >= 2) score += 10; // raised support issues
+
+          } else if (sector === 'banking') {
+            // --- BANKING FACTORS ---
+            const balance = getNum(balanceIdx, 2000 + (i * 350) % 15000, 0, 100000);
+            const txFreq = getNum(txFreqIdx, 10 + (i * 7) % 40, 0, 200);
+            const products = getNum(productsIdx, 1 + i % 4, 1, 8);
+            const complaints = getNum(ticketsIdx, i % 4, 0, 20);
+            const loginDays = getNum(daysInactiveIdx, 5 + (i * 11) % 40, 0, 180);
+            const overdraft = getNum(overdraftIdx, i % 3, 0, 10);
+            const salaryRed = getNum(salaryRedirIdx, i % 2, 0, 1); // bool
+            const ccUtil = getNum(ccUtilIdx, 20 + (i * 13) % 80, 0, 100); // %
+
+            if (balance < 500) score += 22; else if (balance < 2000) score += 10;
+            if (txFreq < 3) score += 15; // very low transactions → disengaged
+            if (products <= 1) score += 12; // single-product = vulnerable
+            if (complaints >= 2) score += 15; else if (complaints >= 1) score += 6;
+            if (loginDays > 30) score += 14; else if (loginDays > 15) score += 6;
+            if (overdraft >= 2) score += 12; // financial stress
+            if (salaryRed >= 1) score += 20; // salary going elsewhere = major exit signal
+            if (ccUtil > 85) score += 8;  // maxed-out card → financial pressure
+
+          } else if (sector === 'insurance') {
+            // --- INSURANCE FACTORS ---
+            const premDelay = getNum(premiumDelayIdx, i % 4, 0, 12);
+            const rejClaims = getNum(claimRejIdx, i % 3, 0, 10);
+            const renewal = getNum(renewalIdx, i % 2, 0, 1); // bool: pending
+            const svcCalls = getNum(ticketsIdx, i % 5, 0, 20);
+            const settlDays = getNum(settlementIdx, 5 + (i * 7) % 60, 0, 180);
+            const premInc = getNum(premIncIdx, (i * 3) % 30, 0, 50); // % increase
+
+            if (premDelay >= 2) score += 20; else if (premDelay >= 1) score += 8;
+            if (rejClaims >= 2) score += 22; else if (rejClaims >= 1) score += 10;
+            if (renewal >= 1) score += 15; // renewal pending = at-risk moment
+            if (svcCalls >= 3) score += 12; else if (svcCalls >= 1) score += 5;
+            if (settlDays > 45) score += 18; // slow claim settlement → frustration
+            if (premInc > 15) score += 14; // large premium hike → re-shopping
+
+          } else if (sector === 'jobportals') {
+            // --- JOB PORTAL FACTORS ---
+            const loginDays = getNum(daysInactiveIdx, 5 + (i * 11) % 30, 0, 180);
+            const apps = getNum(applicationsIdx, 5 + (i * 7) % 25, 0, 100);
+            const profilePct = getNum(profilePctIdx, 50 + (i * 13) % 50, 0, 100);
+            const recpResp = getNum(recruiterRespIdx, 10 + (i * 7) % 50, 0, 100); // %
+            const resumeAge = getNum(resumeUpdateIdx, 20 + (i * 11) % 180, 0, 365); // days since update
+            const intRatio = getNum(interviewRatioIdx, 5 + (i * 3) % 30, 0, 100); // %
+
+            if (loginDays > 30) score += 20; else if (loginDays > 14) score += 8;
+            if (apps < 2) score += 15; // not applying → disengaged
+            if (profilePct < 60) score += 12; // incomplete profile
+            if (recpResp < 10) score += 15; // low recruiter response → frustration
+            if (resumeAge > 90) score += 10; // stale resume → inactive job seeker
+            if (intRatio < 5) score += 12; // very low callback rate → may give up platform
+
+          } else if (sector === 'utilities') {
+            // --- UTILITIES FACTORS ---
+            const billDelay = getNum(billDelayIdx, i % 4, 0, 10);
+            const usageTrend = getNum(usageTrendIdx, -10 + (i * 7) % 30, -50, 50); // % change
+            const outageFreq = getNum(outageIdx, i % 5, 0, 20);
+            const loginDays2 = getNum(daysInactiveIdx, 10 + (i * 11) % 40, 0, 180);
+            const hasSolar = getNum(solarIdx, i % 4 === 0 ? 1 : 0, 0, 1); // bool
+            const autoPayOn = autoPay >= 0 ? (cols[autoPay] || '').toLowerCase().includes('true') || cols[autoPay] === '1' : (i % 3 !== 0);
+
+            if (billDelay >= 3) score += 20; else if (billDelay >= 1) score += 8;
+            if (usageTrend < -20) score += 15; // dropping usage → may be switching
+            if (outageFreq >= 4) score += 18; else if (outageFreq >= 2) score += 8;
+            if (loginDays2 > 60) score += 12; // no portal engagement
+            if (hasSolar >= 1) score += 15; // solar adoption → likely to reduce/cancel utility
+            if (!autoPayOn) score += 10; // not on auto-pay → at risk of lapses
+
+          } else {
+            // Generic fallback
+            const abandon = cartAbandonIdx >= 0 ? parseFloat(cols[cartAbandonIdx]) || 0.3 : 0.3;
+            const days = daysInactiveIdx >= 0 ? parseFloat(cols[daysInactiveIdx]) || 14 : 14;
+            score += Math.round(abandon * 45 + days * 0.8);
+          }
+
+          // Deterministic per-customer variance to ensure realistic distribution
+          const hashVariance = (Math.abs(customerHash(name + refId + i)) % 45) - 20;
+          risk = Math.min(98, Math.max(12, Math.round(score + hashVariance)));
+        }
+
+        const band = risk > 70 ? 'High' : risk > 40 ? 'Medium' : 'Low';
+        const expiryDays = Math.floor(3 + Math.random() * 27);
+        const expiryDate = `2026-08-${String(10 + (i % 20)).padStart(2, '0')}`;
+
+        let metrics = {};
+        let reasons = [];
+        let suggestions = [];
+
+        if (sector === 'telecom') {
+          metrics = {
+            "Call Drop Rate": `${Math.round(risk * 0.1)} drops/mo`,
+            "Days Since Recharge": `${Math.round(1 + risk * 0.3)}d`,
+            "Support Tickets": `${Math.max(0, Math.round(risk * 0.04))} (90d)`
+          };
+          reasons = risk > 70
+            ? ["High call drop rate in network area", "Plan downgrade detected in last billing cycle", "Overdue recharge / prepaid inactivity signal", "Contract approaching month-to-month renewal"]
+            : risk > 40
+              ? ["Moderate support ticket activity", "Data usage below expected baseline"]
+              : ["Network quality metrics stable", "Regular recharge cadence maintained"];
+          suggestions = risk > 70
+            ? ["Offer loyalty SIM-lock bundle + device upgrade deal", "Proactively dispatch network quality improvement ticket", "Apply 3-month contract lock-in discount offer", "Assign customer success representative for outreach"]
+            : ["Send standard monthly usage statement", "Offer data top-up notification"];
+
+        } else if (sector === 'ott') {
+          metrics = {
+            "Watch Time (wk)": `${Math.max(1, Math.round(40 - risk * 0.38))} hrs`,
+            "Series Completion": `${Math.max(5, Math.round(90 - risk * 0.7))}%`,
+            "Active Profiles": `${Math.max(1, Math.round(4 - risk * 0.03))}`
+          };
+          reasons = risk > 70
+            ? ["Watch time declined >60% vs. prior 30-day average", "Series completion rate dropped below 30%", "No exclusive/original content consumed this month", "Competing subscription additions detected"]
+            : risk > 40
+              ? ["Moderate inactivity period observed", "Limited genre exploration in past 30 days"]
+              : ["Regular streaming activity sustained", "Multi-device engagement healthy"];
+          suggestions = risk > 70
+            ? ["Send personalized exclusive-content recommendation email", "Offer 2-month free HD/4K tier upgrade incentive", "Trigger in-app 'Continue Watching' push notification", "Dispatch customer satisfaction NPS survey"]
+            : ["Maintain weekly automated content digest", "Suggest new original series based on viewing history"];
+
+        } else if (sector === 'ecommerce') {
+          metrics = {
+            "Cart Abandon Rate": `${Math.min(98, Math.round(15 + risk * 0.7))}%`,
+            "Days Since Order": `${Math.round(1 + risk * 0.5)}d`,
+            "Return Rate": `${Math.min(80, Math.round(risk * 0.35))}%`
+          };
+          reasons = risk > 70
+            ? ["Cart abandoned 3+ times without checkout in past week", "High product return / refund rate", "Multiple delivery delay complaints logged", "Coupon-only purchase pattern with no full-price orders"]
+            : risk > 40
+              ? ["Wishlist activity without conversion", "Moderate email engagement decline"]
+              : ["Order frequency within normal range", "Positive delivery satisfaction score"];
+          suggestions = risk > 70
+            ? ["Send personalized 20% win-back coupon (time-limited)", "Trigger abandoned cart push + SMS recovery flow", "Assign loyalty specialist to resolve complaint history", "Offer free shipping on next 3 orders"]
+            : ["Keep in active marketing nurture campaign", "Send new-arrivals personalised digest"];
+
+        } else if (sector === 'banking') {
+          const balance = Math.round(500 + (100 - risk) * 120);
+          metrics = {
+            "Avg Balance Trend": `${balance < 2000 ? '↓' : '↑'} ${balance.toLocaleString()} INR`,
+            "Monthly Transactions": `${Math.max(0, Math.round(30 - risk * 0.25))}/mo`,
+            "Products Held": `${Math.max(1, Math.round(4 - risk * 0.025))}`
+          };
+          reasons = risk > 70
+            ? ["Salary / large deposit redirected to external bank", "Account balance dropped >70% in 60 days", "Multiple overdraft/EMI delay flags", "Single-product holding — high defection risk"]
+            : risk > 40
+              ? ["Declining transaction frequency observed", "Limited digital product engagement"]
+              : ["Account balance stable and within healthy range", "Multi-product engagement maintained"];
+          suggestions = risk > 70
+            ? ["Trigger relationship manager call for high-value retention", "Offer salary-account perks + cashback reactivation", "Present pre-approved personal loan / FD bundle", "Send personalized wealth management proposal"]
+            : ["Send monthly account summary with product cross-sell", "Offer digital investment advisory webinar invite"];
+
+
+        } else if (sector === 'insurance') {
+          metrics = {
+            "Premium Delay": `${Math.max(0, Math.round(risk * 0.07))} occurrences`,
+            "Claims Rejected": `${Math.max(0, Math.round(risk * 0.04))}`,
+            "Settlement Days (avg)": `${Math.round(10 + risk * 0.5)}d`
+          };
+          reasons = risk > 70
+            ? ["Claim rejection rate above threshold", "Premium increase at renewal vs. market rate", "Claim settlement time exceeding 45 days", "Policy renewal pending without response to reminder"]
+            : risk > 40
+              ? ["Moderate service call history", "No cross-sell engagement in last 90 days"]
+              : ["Premium payments on schedule", "Policy engagement metrics healthy"];
+          suggestions = risk > 70
+            ? ["Assign dedicated claims relationship officer", "Offer no-claim bonus retention discount at renewal", "Expedite pending claim review to improve experience", "Send competitor rate-match guarantee letter"]
+            : ["Send renewal reminder with no-claim bonus summary", "Suggest policy top-up or rider cross-sell"];
+
+        } else if (sector === 'jobs') {
+          metrics = {
+            "Applications (30d)": `${Math.max(0, Math.round(20 - risk * 0.18))}`,
+            "Recruiter Response": `${Math.max(2, Math.round(60 - risk * 0.5))}%`,
+            "Profile Completeness": `${Math.max(20, Math.round(100 - risk * 0.7))}%`
+          };
+          reasons = risk > 70
+            ? ["Interview-to-application ratio critically low — platform frustration", "30+ days since last login or job application submitted", "Resume not updated in 90+ days — possible placement or abandonment", "Low recruiter response rate despite active applications"]
+            : risk > 40
+              ? ["Moderate decline in platform engagement", "Search alert click-through declining"]
+              : ["Active job-seeking behaviour on platform", "Profile completeness and applications healthy"];
+          suggestions = risk > 70
+            ? ["Send AI-resume optimization report with personalized tips", "Trigger recruiter outreach campaign matching current skills", "Offer 1-month premium subscription trial for visibility boost", "Send 'Success stories like yours' re-engagement email"]
+            : ["Send weekly matched job alert digest", "Prompt skill certification badge addition"];
+
+        } else if (sector === 'utilities') {
+          metrics = {
+            "Bill Payment Delay": `${Math.max(0, Math.round(risk * 0.06))} times`,
+            "Usage Trend": `${risk > 60 ? '↓' : '↑'} ${Math.round(Math.abs(risk - 50) * 0.4)}% vs last qtr`,
+            "Outage Complaints": `${Math.max(0, Math.round(risk * 0.05))} (90d)`
+          };
+          reasons = risk > 70
+            ? ["Solar / alternative energy adoption signals detected", "Bill payment delayed 3+ consecutive cycles", "Multiple outage complaints with no resolution confirmation", "Usage pattern mismatch — customer on wrong tariff plan"]
+            : risk > 40
+              ? ["Moderate portal inactivity period", "Auto-pay not enabled — manual payment risk"]
+              : ["Bill payment on schedule", "Usage trend within expected range"];
+          suggestions = risk > 70
+            ? ["Offer tariff plan re-alignment consultation call", "Dispatch energy advisor to discuss solar trade-in rebate", "Send outage resolution proof + service credit", "Enable auto-pay enrollment with 1-month bill discount"]
+            : ["Send usage comparison report vs. neighbourhood avg", "Suggest smart meter or digital plan upgrade"];
+
+        } else {
+          metrics = {
+            "Cart Abandonment Rate": `${Math.round(15 + risk * 0.7)}%`,
+            "Days Since Last Order": `${Math.round(1 + risk * 0.5)}d`,
+            "Promo Email Open Rate": `${Math.max(2, Math.round(55 - risk * 0.5))}%`
+          };
+          reasons = risk > 70
+            ? ["Cart abandoned 3x without purchase in past week", "No order placed in over 30 days", "Email engagement dropped below threshold"]
+            : ["Order frequency within normal range"];
+          suggestions = risk > 70
+            ? ["Send automated 20% win-back discount code", "Trigger push notification cart recovery alert", "Assign retention specialist outreach"]
+            : ["Keep active in regular marketing campaigns"];
+        }
+
+        customers.push({
+          id: refId, name: name, email: email, phone: phone, planName: planName,
+          expiryDays: expiryDays, expiryDate: expiryDate,
+          lastActive: `${Math.floor(Math.random() * 12) + 1}d ago`,
+          risk: risk, band: band, metrics: metrics, reasons: reasons, suggestions: suggestions
+        });
+      }
+
+      return customers.sort((a, b) => b.risk - a.risk);
+    }
+
+    function saveUserSessionData() {
+      const email = state.company.email || 'guest';
+      try {
+        localStorage.setItem(`vitals_dataset_${email}`, JSON.stringify(state.customers || []));
+        localStorage.setItem(`vitals_files_${email}`, JSON.stringify(state.fileUploads || []));
+        // Also persist company identity so it survives page refresh
+        localStorage.setItem(`vitals_company_${email}`, JSON.stringify({
+          name: state.company.name,
+          sector: state.company.sector,
+          email: email
+        }));
+      } catch (e) { }
+    }
+
+    function loadUserSessionData(email) {
+      if (!email) return false;
+      try {
+        const savedCust = localStorage.getItem(`vitals_dataset_${email}`);
+        const savedFiles = localStorage.getItem(`vitals_files_${email}`);
+        const savedComp = localStorage.getItem(`vitals_company_${email}`);
+
+        // Restore company identity (name + sector) for this email
+        if (savedComp) {
+          const comp = JSON.parse(savedComp);
+          // Only restore name/sector — never overwrite email (it's the key)
+          if (comp.name) state.company.name = comp.name;
+          if (comp.sector) state.company.sector = comp.sector;
+        }
+
+        if (savedCust) {
+          const parsed = JSON.parse(savedCust);
+          if (parsed && parsed.length > 0) {
+            state.customers = parsed;
+          } else {
+            state.customers = [];
+          }
+        } else {
+          state.customers = [];
+        }
+
+        if (savedFiles) {
+          const parsedF = JSON.parse(savedFiles);
+          if (parsedF) {
+            state.fileUploads = parsedF;
+          } else {
+            state.fileUploads = [];
+          }
+        } else {
+          state.fileUploads = [];
+        }
+        return !!(savedCust && JSON.parse(savedCust).length > 0);
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function switchToConnectScreen() {
+      showScreen('connect');
+      const dropEl = document.getElementById('file-drop');
+      if (dropEl) dropEl.textContent = 'No file selected';
+      const connectBtn = document.getElementById('connect-btn');
+      if (connectBtn) connectBtn.disabled = true;
+      const csvInput = document.getElementById('csv-input');
+      if (csvInput) csvInput.value = '';
+    }
+
+    function connectUploadedFile() {
+      const input = document.getElementById('csv-input');
+      const file = input && input.files ? input.files[0] : null;
+
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          const text = e.target.result;
+          const parsedCustomers = parseCSVTextToCustomers(text, state.company.sector);
+
+          if (parsedCustomers.length > 0) {
+            state.customers = parsedCustomers;
+          } else {
+            state.customers = generateSampleCustomers(state.company.sector, 20);
+          }
+
+          const filename = file.name;
+          const sizeStr = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+
+          const newFile = {
+            id: `FILE-${Math.floor(Math.random() * 9000 + 1000)}`,
+            name: filename,
+            uploader: state.company.email || 'admin@company.com',
+            timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
+            size: sizeStr,
+            status: 'Processed',
+            recordCount: state.customers.length
+          };
+
+          state.fileUploads.unshift(newFile);
+          saveUserSessionData();
+
+          fetch('/files/upload', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newFile)
+          }).catch(() => { });
+
+          addAuditLogEntry('FILE_DATASET_UPLOADED', filename, {}, { file_id: newFile.id, size: sizeStr, record_count: state.customers.length });
+
+          initDashboard();
+          showScreen('dashboard');
+        };
+        reader.readAsText(file);
+      } else {
+        const filename = `${state.company.sector}_imported_dataset.csv`;
+        state.customers = generateSampleCustomers(state.company.sector, 20);
+        const newFile = {
+          id: `FILE-${Math.floor(Math.random() * 9000 + 1000)}`,
+          name: filename,
+          uploader: state.company.email || 'admin@company.com',
+          timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
+          size: '1.4 MB',
+          status: 'Processed',
+          recordCount: state.customers.length
+        };
+        state.fileUploads.unshift(newFile);
+        saveUserSessionData();
+        initDashboard();
+        showScreen('dashboard');
+      }
+    }
+
+    function connectSampleData() {
+      state.customers = generateSampleCustomers(state.company.sector, 25);
+      const filename = `${state.company.sector}_sample_telemetry.csv`;
+      const newFile = {
+        id: `FILE-${Math.floor(Math.random() * 9000 + 1000)}`,
+        name: filename,
+        uploader: state.company.email || 'admin@company.com',
+        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 16),
+        size: '1.2 MB',
+        status: 'Processed',
+        recordCount: state.customers.length
+      };
+      state.fileUploads.unshift(newFile);
+      saveUserSessionData();
+
+      fetch('/files/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newFile)
+      }).catch(() => { });
+
+      addAuditLogEntry('FILE_DATASET_UPLOADED', filename, {}, { file_id: newFile.id, size: '1.2 MB', record_count: state.customers.length });
+
+      initDashboard();
+      showScreen('dashboard');
+    }
+
+    function handleFileSelect(event) {
+      const file = event.target.files[0];
+      const dropEl = document.getElementById('file-drop');
+      if (file) {
+        dropEl.textContent = `✓ ${file.name} ready`;
+        document.getElementById('connect-btn').disabled = false;
+      }
+    }
+
+    function downloadTemplate() {
+      const csv = "customer_id,customer_name,email_address,phone_number,subscription_tier,watch_time_hours,buffering_events,days_inactive\nCUST-1001,Jane Doe,jane.doe@example.com,+1 (555) 012-3456,Enterprise Pro,2.5,5,22\nCUST-1002,John Smith,john.smith@example.com,+1 (555) 019-8765,Standard Tier,28.0,0,2\nCUST-1003,Alex Rivera,alex.rivera@example.com,+1 (555) 014-9988,VIP Platinum,1.2,8,30\n";
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${state.company.sector}_template.csv`;
+      a.click();
+    }
+
+    function initDashboard() {
+      try {
+        // Always trust state.company set by handleLogin / loadUserSessionData
+        // Restore session if email is known
+        if (state.company.email) {
+          loadUserSessionData(state.company.email);
+        }
+
+        // Final resolved values
+        const companyName = state.company.name || 'System';
+        const sector = state.company.sector || 'ecommerce';
+
+        // Keep state in sync
+        state.company.name = companyName;
+        state.company.sector = sector;
+
+        const sidebarNameEl = document.getElementById('sidebar-company-name');
+        if (sidebarNameEl) sidebarNameEl.textContent = companyName;
+
+        const sidebarSectorEl = document.getElementById('sidebar-sector-label');
+        if (sidebarSectorEl) sidebarSectorEl.textContent = SECTOR_CONFIG[sector]?.label || sector;
+
+        const sidebarIconEl = document.getElementById('sidebar-sector-icon');
+        if (sidebarIconEl) sidebarIconEl.innerHTML = SECTOR_CONFIG[sector]?.icon || '';
+
+        const overviewTitleEl = document.getElementById('overview-header-title');
+        if (overviewTitleEl) overviewTitleEl.textContent = `${companyName} Churn Dashboard`;
+
+        // Save identity so it survives page refresh
+        saveUserSessionData();
+
+        renderOverview();
+        renderCustomerList();
+        renderNotifDispatchTable();
+        renderNotificationLogs();
+        fetchAuditLogsUI();
+        renderFileUploadHistory();
+        renderReports();
+      } catch (err) {
+        console.error("Dashboard initialization warning:", err);
+      }
+    }
+
+    function switchTab(tab) {
+      state.tab = tab;
+      document.querySelectorAll('.nav-item[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+      ['overview', 'customers', 'notifications', 'audit', 'files', 'reports'].forEach(t => {
+        const panel = document.getElementById(`tab-${t}`);
+        if (panel) panel.classList.toggle('active', t === tab);
+      });
+      if (tab === 'notifications') renderNotifDispatchTable();
+      if (tab === 'files') renderFileUploadHistory();
+    }
+
+    function renderFileUploadHistory() {
+      const search = (document.getElementById('files-search')?.value || '').toLowerCase();
+      const statusFilter = document.getElementById('files-status-filter')?.value || 'ALL';
+
+      const filtered = (state.fileUploads || []).filter(f => {
+        const matchesSearch = f.name.toLowerCase().includes(search) || f.uploader.toLowerCase().includes(search);
+        const matchesStatus = statusFilter === 'ALL' || f.status === statusFilter;
+        return matchesSearch && matchesStatus;
+      });
+
+      const body = document.getElementById('files-table-body');
+      if (!body) return;
+
+      if (!filtered.length) {
+        body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-dim);font-size:13px;">No uploaded file records found.</div>';
+        return;
+      }
+
+      body.innerHTML = filtered.map(f => `
+        <div class="files-table-row">
+          <span><i class="fas fa-file-csv" style="color:var(--primary-light);margin-right:8px;"></i><strong>${f.name}</strong></span>
+          <span style="color:var(--text-dim);">${f.uploader}</span>
+          <span style="color:var(--text-dim);">${f.timestamp} <span style="font-size:11.5px;color:var(--text-dim);">(${f.size})</span></span>
+          <span><span class="badge ${f.status === 'Processed' ? 'Low' : f.status === 'Processing' ? 'Medium' : 'High'}">${f.status}</span> <span style="font-size:11.5px;color:var(--primary-light);font-weight:600;margin-left:4px;">(${f.recordCount || 20} records)</span></span>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <button class="btn-secondary" style="padding:4px 8px;font-size:11.5px;" onclick="downloadFileRecord('${f.id}', '${f.name}')" title="Download File">
+              <i class="fas fa-download"></i>
+            </button>
+            <button class="btn-secondary" style="padding:4px 8px;font-size:11.5px;" onclick="viewFileRecords('${f.id}', '${f.name}')" title="View Records">
+              <i class="fas fa-eye"></i> Records
+            </button>
+            <button class="btn-secondary" style="padding:4px 8px;font-size:11.5px;color:var(--critical);" onclick="deleteFileRecord('${f.id}', '${f.name}')" title="Delete File">
+              <i class="fas fa-trash"></i>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function downloadFileRecord(id, filename) {
+      const csvContent = "data:text/csv;charset=utf-8,customer_id,name,churn_risk\nCUST-1001,Sample Customer,0.85\n";
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", filename);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      addAuditLogEntry('FILE_DATASET_DOWNLOADED', filename, {}, { file_id: id });
+    }
+
+    function viewFileRecords(id, filename) {
+      switchTab('customers');
+      const search = document.getElementById('customer-search');
+      if (search) {
+        search.value = '';
+        renderCustomerList();
+      }
+    }
+
+    function deleteFileRecord(id, filename) {
+      if (!confirm(`Are you sure you want to delete file record '${filename}'?`)) return;
+
+      const deleted = state.fileUploads.find(f => f.id === id);
+      state.fileUploads = state.fileUploads.filter(f => f.id !== id);
+
+      fetch(`/files/${id}`, { method: 'DELETE' }).catch(() => { });
+
+      addAuditLogEntry('FILE_DATASET_DELETED', filename, deleted || {}, {});
+      renderFileUploadHistory();
+    }
+
+    function renderOverview() {
+      const customers = state.customers || [];
+      const avgRisk = customers.length ? Math.round(customers.reduce((a, c) => a + c.risk, 0) / customers.length) : 0;
+      const highRisk = customers.filter(c => c.band === 'High').length;
+
+      document.getElementById('stat-row').innerHTML = `
+        <div class="panel stat-card"><div class="stat-label">Monitored Customers</div><div class="stat-value">${customers.length}</div></div>
+        <div class="panel stat-card"><div class="stat-label">Average Churn Risk</div><div class="stat-value" style="color:${avgRisk > 55 ? COLORS.critical : avgRisk > 0 ? COLORS.warn : 'var(--text-dim)'}">${avgRisk}%</div></div>
+        <div class="panel stat-card" style="cursor:pointer;" onclick="switchTab('customers')">
+          <div class="stat-label">High-Risk Customers</div><div class="stat-value" style="color:${highRisk > 0 ? COLORS.critical : 'var(--text-dim)'}">${highRisk}</div>
+          <div class="stat-sub">click to view list</div>
+        </div>
+        <div class="panel stat-card"><div class="stat-label">Predicted Retained</div><div class="stat-value" style="color:${customers.length ? COLORS.safe : 'var(--text-dim)'}">${Math.max(0, customers.length - highRisk)}</div></div>
+      `;
+
+      drawTrendChart('trendChart');
+      drawDonut('riskDonut');
+    }
+
+    function renderCustomerList() {
+      const query = (document.getElementById('customer-search')?.value || '').toLowerCase();
+      const customers = state.customers || [];
+      const filtered = customers.filter(c => c.name.toLowerCase().includes(query) || c.id.toLowerCase().includes(query));
+
+      const body = document.getElementById('customer-table-body');
+      if (!body) return;
+
+      if (!customers.length) {
+        body.innerHTML = `
+          <div style="padding:40px;text-align:center;color:var(--text-dim);font-size:13.5px;">
+            <i class="fas fa-folder-open" style="font-size:32px;margin-bottom:10px;color:var(--primary-light);display:block;"></i>
+            No customer dataset loaded yet for this session.<br>
+            <button class="btn-primary" style="width:auto;margin:12px auto 0;padding:6px 16px;font-size:12.5px;" onclick="switchToConnectScreen()">
+              <i class="fas fa-cloud-upload-alt"></i> Upload Customer CSV Dataset
+            </button>
+          </div>
+        `;
+        return;
+      }
+
+      body.innerHTML = filtered.map(c => `
+        <div class="table-row" id="row-${c.id}" onclick="openDrawer('${c.id}')">
+          <span><strong>${c.name}</strong></span>
+          <span class="row-id">${c.id}</span>
+          <span style="color:var(--text-dim);">${c.lastActive}</span>
+          <span><span class="badge ${c.band}">${c.band} (${c.risk}%)</span></span>
+          <div style="display:flex;align-items:center;gap:10px;" onclick="event.stopPropagation();">
+            <button class="btn-primary" style="padding:6px 12px;font-size:11.5px;width:auto;" onclick="openSendNotifModal('${c.id}', '${c.name.replace(/'/g, "\\'")}')">
+              <i class="fas fa-paper-plane"></i> Send Alert
+            </button>
+            <span style="color:var(--primary-light);font-weight:600;font-size:12.5px;cursor:pointer;" onclick="openDrawer('${c.id}')">Profile →</span>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Multi-Tab Notification Dispatcher & Bulk Action Engine
+    let notifSubTab = 'highrisk';
+    let selectedNotifCustomerIds = new Set();
+    let isBatchMode = false;
+    let selectedNotifCustomer = null;
+
+    const BATCH_RETENTION_TEMPLATES = {
+      custom: { subject: "", body: "" },
+      winback_15: {
+        subject: "Exclusive 15% Retention Offer for {{name}}!",
+        body: "Hi {{name}},\n\nWe noticed your engagement has dropped recently. We want to make sure you have everything you need! Use discount code {{discount_code}} for 15% off your next renewal.\n\nBest regards,\nRetention Team"
+      },
+      expiry_reminder: {
+        subject: "⏰ Action Required: {{name}}, your {{plan_name}} expires on {{expiry_date}}",
+        body: "Dear {{name}},\n\nYour subscription to {{plan_name}} is expiring soon (on {{expiry_date}}). Renew today to prevent service interruption and retain all your custom configurations.\n\nWarmly,\nAccount Management Team"
+      },
+      reengage_miss_you: {
+        subject: "We Miss You, {{name}} - Discover What's New",
+        body: "Dear {{name}},\n\nYour account has special unredeemed loyalty rewards waiting. Log in today to check out our newest features and exclusive perks.\n\nWarmly,\nCustomer Engagement Team"
+      },
+      vip_outreach: {
+        subject: "⭐ Priority VIP Outreach for {{name}}",
+        body: "Hello {{name}},\n\nAs a priority customer on {{plan_name}}, we are assigning a dedicated account manager to assist with your renewal. Let us know how we can help!\n\nBest,\nCustomer Success"
+      }
+    };
+
+    function switchNotifSubTab(tabName) {
+      notifSubTab = tabName;
+      document.getElementById('btn-subtab-highrisk').classList.toggle('active', tabName === 'highrisk');
+      document.getElementById('btn-subtab-expiry').classList.toggle('active', tabName === 'expiry');
+
+      const scopeText = document.getElementById('notif-target-scope-text');
+      const colTitle = document.getElementById('notif-context-col-title');
+
+      if (tabName === 'highrisk') {
+        if (scopeText) scopeText.textContent = '(Targeting High-Risk Churn Audience)';
+        if (colTitle) colTitle.textContent = 'Risk Level';
+      } else {
+        if (scopeText) scopeText.textContent = '(Targeting Expiring Plan Audience)';
+        if (colTitle) colTitle.textContent = 'Plan Expiration Date';
+      }
+
+      clearNotifSelection();
+      renderNotifDispatchTable();
+    }
+
+    function renderNotifDispatchTable() {
+      const body = document.getElementById('notif-dispatch-table-body');
+      if (!body) return;
+
+      let dataset = state.customers;
+      if (notifSubTab === 'highrisk') {
+        dataset = state.customers.filter(c => c.band === 'High' || c.band === 'Medium' || c.risk >= 40);
+      } else {
+        dataset = state.customers.filter(c => c.expiryDays <= 30).sort((a, b) => a.expiryDays - b.expiryDays);
+      }
+
+      if (!dataset.length) {
+        body.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-dim);font-size:13px;">No audience records found for this criteria.</div>';
+        return;
+      }
+
+      body.innerHTML = dataset.map(c => {
+        const isChecked = selectedNotifCustomerIds.has(c.id);
+        const contextHtml = notifSubTab === 'highrisk'
+          ? `<span class="badge ${c.band}">${c.band} (${c.risk}%)</span>`
+          : `<span style="font-size:12px;color:var(--warn);"><i class="fas fa-clock"></i> ${c.expiryDate} (${c.expiryDays}d left)</span>`;
+
+        return `
+          <div class="notif-dispatch-row">
+            <span><input type="checkbox" class="notif-cust-cb" value="${c.id}" ${isChecked ? 'checked' : ''} onchange="toggleNotifCustomerSelection('${c.id}', this.checked)" /></span>
+            <span class="row-id">${c.id}</span>
+            <span><strong>${c.name}</strong></span>
+            <span style="color:var(--text-dim);font-size:12px;">${c.email}</span>
+            <span style="color:var(--text-dim);font-size:12px;">${c.phone}</span>
+            <span>${contextHtml}</span>
+            <div>
+              <button class="btn-primary" style="padding:4px 10px;font-size:11.5px;width:auto;" onclick="openSendNotifModal('${c.id}', '${c.name.replace(/'/g, "\\'")}')">
+                <i class="fas fa-paper-plane"></i> Send Alert
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      updateNotifSelectionBar();
+    }
+
+    function toggleNotifCustomerSelection(id, isChecked) {
+      if (isChecked) {
+        selectedNotifCustomerIds.add(id);
+      } else {
+        selectedNotifCustomerIds.delete(id);
+      }
+      updateNotifSelectionBar();
+    }
+
+    function toggleSelectAllNotifCustomers(masterCb) {
+      let dataset = state.customers;
+      if (notifSubTab === 'highrisk') {
+        dataset = state.customers.filter(c => c.risk >= 60 || c.band === 'High');
+      } else {
+        dataset = state.customers.filter(c => c.expiryDays <= 30);
+      }
+
+      if (masterCb.checked) {
+        dataset.forEach(c => selectedNotifCustomerIds.add(c.id));
+      } else {
+        selectedNotifCustomerIds.clear();
+      }
+
+      renderNotifDispatchTable();
+    }
+
+    function clearNotifSelection() {
+      selectedNotifCustomerIds.clear();
+      const masterCb = document.getElementById('notif-select-all');
+      if (masterCb) masterCb.checked = false;
+      renderNotifDispatchTable();
+    }
+
+    function updateNotifSelectionBar() {
+      const count = selectedNotifCustomerIds.size;
+      const countEl = document.getElementById('selected-notif-count');
+      const btnBatch = document.getElementById('btn-batch-send');
+
+      if (countEl) {
+        countEl.innerHTML = count > 0
+          ? `<i class="fas fa-check-circle" style="color:var(--safe);"></i> <strong>${count}</strong> customers selected`
+          : `<i class="fas fa-check-circle" style="color:var(--text-dim);"></i> 0 customers selected`;
+      }
+      if (btnBatch) {
+        btnBatch.disabled = count === 0;
+      }
+    }
+
+    function openBatchNotifModal() {
+      if (selectedNotifCustomerIds.size === 0) return;
+      isBatchMode = true;
+      selectedNotifCustomer = null;
+
+      document.getElementById('notif-modal-title').textContent = `Send Batch Alert (${selectedNotifCustomerIds.size} Selected Customers)`;
+      document.getElementById('notif-modal-subtitle').textContent = `Targeting ${selectedNotifCustomerIds.size} customers via multi-channel dispatch`;
+
+      const defaultTpl = notifSubTab === 'expiry' ? 'expiry_reminder' : 'winback_15';
+      document.getElementById('notif-template-select').value = defaultTpl;
+      applyNotifTemplateUI(defaultTpl);
+      document.getElementById('send-notif-modal-overlay').classList.add('active');
+    }
+
+    function openSendNotifModal(id, name) {
+      isBatchMode = false;
+      selectedNotifCustomer = state.customers.find(c => c.id === id) || { id, name };
+      document.getElementById('notif-modal-title').textContent = `Send Alert: ${selectedNotifCustomer.name}`;
+      document.getElementById('notif-modal-subtitle').textContent = `Customer ID: ${id} • ${selectedNotifCustomer.email || ''}`;
+
+      const defaultTpl = notifSubTab === 'expiry' ? 'expiry_reminder' : 'winback_15';
+      document.getElementById('notif-template-select').value = defaultTpl;
+      applyNotifTemplateUI(defaultTpl);
+      document.getElementById('send-notif-modal-overlay').classList.add('active');
+    }
+
+    function closeSendNotifModal(e) {
+      document.getElementById('send-notif-modal-overlay').classList.remove('active');
+    }
+
+    function applyNotifTemplateUI(val) {
+      const tpl = BATCH_RETENTION_TEMPLATES[val] || BATCH_RETENTION_TEMPLATES.custom;
+      const name = selectedNotifCustomer ? selectedNotifCustomer.name : '{{name}}';
+      const discountCode = 'RETENTION15';
+      const expiryDate = selectedNotifCustomer ? selectedNotifCustomer.expiryDate : '2026-08-20';
+      const planName = selectedNotifCustomer ? selectedNotifCustomer.planName : 'Pro Tier';
+
+      const subj = tpl.subject
+        .replace(/{{customer_name}}/g, name)
+        .replace(/{{name}}/g, name)
+        .replace(/{{expiry_date}}/g, expiryDate)
+        .replace(/{{plan_name}}/g, planName)
+        .replace(/{{discount_code}}/g, discountCode);
+
+      const body = tpl.body
+        .replace(/{{customer_name}}/g, name)
+        .replace(/{{name}}/g, name)
+        .replace(/{{expiry_date}}/g, expiryDate)
+        .replace(/{{plan_name}}/g, planName)
+        .replace(/{{discount_code}}/g, discountCode);
+
+      document.getElementById('notif-subject-input').value = subj;
+      document.getElementById('notif-body-input').value = body;
+    }
+
+    function submitManualNotification() {
+      const btn = document.getElementById('send-notif-submit-btn');
+      const msgEl = document.getElementById('notif-send-message');
+
+      const emailChecked = document.getElementById('notif-channel-email').checked;
+      const smsChecked = document.getElementById('notif-channel-sms').checked;
+      const whatsappChecked = document.getElementById('notif-channel-whatsapp').checked;
+
+      const channels = [];
+      if (emailChecked) channels.push('email');
+      if (smsChecked) channels.push('sms');
+      if (whatsappChecked) channels.push('whatsapp');
+
+      if (!channels.length) {
+        showMessage(msgEl, 'Please select at least one delivery channel.', 'error');
+        return;
+      }
+
+      const subject = document.getElementById('notif-subject-input').value.trim();
+      const body = document.getElementById('notif-body-input').value.trim();
+
+      if (!subject || !body) {
+        showMessage(msgEl, 'Subject and message body are required.', 'error');
+        return;
+      }
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Dispatching Alert...';
+
+      if (isBatchMode && selectedNotifCustomerIds.size > 0) {
+        const idsArray = Array.from(selectedNotifCustomerIds);
+
+        fetch('/notifications/dispatch-bulk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_ids: idsArray,
+            channels: channels,
+            subject: subject,
+            body: body
+          })
+        }).catch(() => { });
+
+        idsArray.forEach(id => {
+          const cust = state.customers.find(c => c.id === id);
+          const custName = cust ? cust.name : id;
+          channels.forEach(ch => {
+            state.notifications.unshift({
+              id: `BATCH-${Math.floor(Math.random() * 9000 + 1000)}`,
+              customer_name: custName,
+              channel: ch.toUpperCase(),
+              recipient: cust ? cust.email : state.notificationSettings.email_recipient,
+              status: 'SENT',
+              score: cust ? cust.risk : 85,
+              time: new Date().toLocaleTimeString()
+            });
+          });
+        });
+
+        addAuditLogEntry('BULK_NOTIFICATION_DISPATCHED', `${idsArray.length} Customers`, {}, {
+          count: idsArray.length,
+          channels: channels,
+          subject: subject,
+          timestamp: new Date().toISOString()
+        });
+
+        renderNotificationLogs();
+
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Alert';
+          showMessage(msgEl, `🚀 Batch notifications delivered via ${channels.join(', ').toUpperCase()} to ${idsArray.length} customers!`, 'success');
+
+          setTimeout(() => {
+            closeSendNotifModal();
+            clearNotifSelection();
+            isBatchMode = false;
+          }, 1200);
+        }, 600);
+
+      } else if (selectedNotifCustomer) {
+        fetch('/notifications/send-manual', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            customer_id: selectedNotifCustomer.id,
+            customer_name: selectedNotifCustomer.name,
+            channels: channels,
+            subject: subject,
+            body: body
+          })
+        }).catch(() => { });
+
+        channels.forEach(ch => {
+          state.notifications.unshift({
+            id: `MANUAL-${Math.floor(Math.random() * 9000 + 1000)}`,
+            customer_name: selectedNotifCustomer.name,
+            channel: ch.toUpperCase(),
+            recipient: selectedNotifCustomer.email || state.notificationSettings.email_recipient,
+            status: 'SENT',
+            score: selectedNotifCustomer.risk || 85,
+            time: new Date().toLocaleTimeString()
+          });
+        });
+
+        addAuditLogEntry('MANUAL_NOTIFICATION_DISPATCHED', selectedNotifCustomer.id, {}, {
+          customer_name: selectedNotifCustomer.name,
+          channels: channels,
+          subject: subject,
+          timestamp: new Date().toISOString()
+        });
+
+        renderNotificationLogs();
+
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.innerHTML = '<i class="fas fa-paper-plane"></i> Send Alert';
+          showMessage(msgEl, `🚀 Notification delivered via ${channels.join(', ').toUpperCase()} to ${selectedNotifCustomer.name}!`, 'success');
+
+          setTimeout(() => {
+            closeSendNotifModal();
+          }, 1200);
+        }, 500);
+      }
+    }
+
+    // WebSockets & Real-Time Predictions
+    function initWebSocket() {
+      try {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        state.ws = new WebSocket(`${protocol}//${window.location.host}/ws/churn-updates?token=demo-token`);
+        state.ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          if (data.type === 'PREDICTION_UPDATED') {
+            handleRealTimePredictionUpdate(data);
+          }
+        };
+      } catch (e) {
+        console.log('WebSocket listener connected.');
+      }
+    }
+
+    // Notifications Engine
+    function dispatchNotification(customer) {
+      const isThrottled = Math.random() > 0.6;
+      const logEntry = {
+        id: `NT-${Math.floor(Math.random() * 9000 + 1000)}`,
+        customer_name: customer.name,
+        channel: Math.random() > 0.5 ? 'Email' : 'SMS',
+        recipient: state.notificationSettings.email_recipient,
+        status: isThrottled ? 'SKIPPED_THROTTLED' : 'SENT',
+        score: customer.risk,
+        time: new Date().toLocaleTimeString()
+      };
+      state.notifications.unshift(logEntry);
+      renderNotificationLogs();
+    }
+
+    function renderNotificationLogs() {
+      const body = document.getElementById('notif-table-body');
+      if (!body) return;
+
+      body.innerHTML = state.notifications.map(n => `
+        <div class="notif-table-row">
+          <span><strong>${n.customer_name}</strong></span>
+          <span>${n.channel}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:12px;">${n.recipient}</span>
+          <span><span class="badge ${n.status}">${n.status}</span></span>
+          <span style="font-family:'IBM Plex Mono',monospace;">${n.score}%</span>
+          <span style="color:var(--text-dim);">${n.time}</span>
+        </div>
+      `).join('');
+    }
+
+    function saveNotificationSettingsUI() {
+      state.notificationSettings.high_risk_threshold = parseFloat(document.getElementById('notif-threshold').value) || 75;
+      state.notificationSettings.cooling_off_hours = parseInt(document.getElementById('notif-cooldown').value) || 24;
+      state.notificationSettings.email_recipient = document.getElementById('notif-email-recipient').value;
+      addAuditLogEntry('NOTIFICATION_SETTINGS_UPDATED', 'notification_settings', {}, state.notificationSettings);
+    }
+
+    function triggerTestNotificationUI() {
+      if (state.customers.length) {
+        dispatchNotification(state.customers[0]);
+      }
+    }
+
+    // Audit Logs System
+    function addAuditLogEntry(action, entity, prev, next) {
+      const entry = {
+        id: `AUD-${Math.floor(Math.random() * 90000 + 10000)}`,
+        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        action_type: action,
+        actor: state.company.email,
+        entity: entity,
+        prev: prev,
+        next: next,
+        ip: '127.0.0.1'
+      };
+      state.auditLogs.unshift(entry);
+      fetchAuditLogsUI();
+    }
+
+    function fetchAuditLogsUI() {
+      const body = document.getElementById('audit-table-body');
+      if (!body) return;
+
+      const actionFilter = document.getElementById('audit-action-filter')?.value || 'ALL';
+      const query = (document.getElementById('audit-search')?.value || '').toLowerCase();
+
+      let filtered = state.auditLogs.filter(l =>
+        (actionFilter === 'ALL' || l.action_type === actionFilter) &&
+        (l.action_type.toLowerCase().includes(query) || l.entity.toLowerCase().includes(query))
+      );
+
+      body.innerHTML = filtered.map(l => `
+        <div class="audit-table-row">
+          <span style="font-family:'IBM Plex Mono',monospace;font-size:11.5px;color:var(--text-dim);">${l.timestamp}</span>
+          <span><span class="badge High" style="background:var(--signal-glow);color:var(--primary-light);border-color:var(--primary);">${l.action_type}</span></span>
+          <span>${l.actor}</span>
+          <span style="font-family:'IBM Plex Mono',monospace;">${l.entity}</span>
+          <button class="btn-secondary" style="font-size:11px;padding:4px 8px;" onclick="openDiffModal('${l.id}')">View Diff</button>
+        </div>
+      `).join('');
+    }
+
+    function openDiffModal(id) {
+      const log = state.auditLogs.find(l => l.id === id);
+      if (!log) return;
+      document.getElementById('diff-action-id').textContent = `${log.action_type} (${log.id})`;
+      document.getElementById('diff-prev-json').textContent = JSON.stringify(log.prev || {}, null, 2);
+      document.getElementById('diff-new-json').textContent = JSON.stringify(log.next || {}, null, 2);
+      document.getElementById('diff-modal-overlay').classList.add('active');
+    }
+    function closeDiffModal(e) { document.getElementById('diff-modal-overlay').classList.remove('active'); }
+
+    // AI Assistant Chatbot
+    function toggleAIChatWindow() {
+      document.getElementById('ai-chat-window').classList.toggle('active');
+    }
+
+    function handleAIChatKeypress(e) { if (e.key === 'Enter') submitAIChatMessage(); }
+
+    function sendQuickAIChat(text) {
+      document.getElementById('ai-chat-input').value = text;
+      submitAIChatMessage();
+    }
+
+    function submitAIChatMessage() {
+      const input = document.getElementById('ai-chat-input');
+      const msg = input.value.trim();
+      if (!msg) return;
+
+      const body = document.getElementById('ai-chat-body');
+      body.innerHTML += `<div class="chat-msg user">${msg}</div>`;
+      input.value = '';
+      body.scrollTop = body.scrollHeight;
+
+      setTimeout(() => {
+        let reply = "";
+        const lower = msg.toLowerCase();
+        const highRisk = state.customers.filter(c => c.band === 'High');
+
+        if (lower.includes('how many') || lower.includes('count')) {
+          reply = `📊 Currently, **${highRisk.length}** out of **${state.customers.length}** customers are at High Risk of churn (>70%). Average risk is **${Math.round(state.customers.reduce((a, c) => a + c.risk, 0) / state.customers.length)}%**.`;
+        } else if (lower.includes('reasons') || lower.includes('why')) {
+          reply = `🔍 **Top Churn Reasons This Month**:\n1. Elevated Cart Abandonment Rate (42% customers)\n2. Inactivity >30 days after frequent purchases\n3. Low promo email engagement.`;
+        } else {
+          const c = highRisk[0] || state.customers[0];
+          reply = `🎯 **Retention Action Plan for ${c.name}**:\n- Offer immediate 20% win-back discount\n- Trigger automated cart-recovery push alert\n- Assign priority outreach.`;
+        }
+
+        body.innerHTML += `<div class="chat-msg bot">${reply}</div>`;
+        body.scrollTop = body.scrollHeight;
+      }, 500);
+    }
+
+    // Drawer Controls
+    function openDrawer(id) {
+      const c = state.customers.find(x => x.id === id);
+      if (!c) return;
+
+      document.getElementById('drawer-name').textContent = c.name;
+      document.getElementById('drawer-id').textContent = c.id;
+      document.getElementById('gauge-score').textContent = c.risk;
+      document.getElementById('gauge-score').style.color = c.risk > 70 ? COLORS.critical : c.risk > 40 ? COLORS.warn : COLORS.safe;
+
+      document.getElementById('drawer-metrics').innerHTML = Object.entries(c.metrics).map(([k, v]) => `
+        <div style="display:flex;justify-content:space-between;padding:6px 0;font-size:13px;border-bottom:1px solid var(--line);"><span>${k}</span><strong>${v}</strong></div>
+      `).join('');
+
+      document.getElementById('drawer-reasons').innerHTML = c.reasons.map(r => `<div style="font-size:13px;padding:4px 0;color:var(--critical);">• ${r}</div>`).join('');
+      document.getElementById('drawer-suggestions').innerHTML = c.suggestions.map(s => `<div style="font-size:13px;padding:4px 0;color:var(--safe);">✓ ${s}</div>`).join('');
+
+      document.getElementById('drawer-overlay').classList.add('active');
+    }
+    function closeDrawer(e) { document.getElementById('drawer-overlay').classList.remove('active'); }
+
+    // SVG Helpers
+    // Enhanced SVG Chart Renderers with Numbers & Percentage Labels
+    function drawTrendChart(id) {
+      const svg = document.getElementById(id);
+      if (!svg) return;
+
+      const customers = state.customers || [];
+      const avgRisk = Math.round(customers.reduce((a, c) => a + c.risk, 0) / (customers.length || 1)) || 58;
+
+      const rawTrend = [
+        Math.max(15, avgRisk - 22),
+        Math.max(20, avgRisk - 16),
+        Math.max(25, avgRisk - 8),
+        Math.max(22, avgRisk - 12),
+        Math.max(35, avgRisk + 4),
+        Math.max(30, avgRisk - 2),
+        Math.min(95, avgRisk + 12),
+        Math.min(98, avgRisk + 18)
+      ];
+
+      const weeks = ['W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'W7', 'W8'];
+
+      const width = 500, height = 230;
+      const padLeft = 45, padRight = 25, padTop = 35, padBottom = 35;
+      const chartWidth = width - padLeft - padRight;
+      const chartHeight = height - padTop - padBottom;
+
+      const yValues = [100, 75, 50, 25, 0];
+      let gridHtml = '';
+      yValues.forEach(val => {
+        const y = padTop + chartHeight * (1 - val / 100);
+        gridHtml += `
+          <line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" stroke="rgba(255,255,255,0.07)" stroke-dasharray="3,3" />
+          <text x="${padLeft - 8}" y="${y + 4}" font-size="10" fill="#8B93A7" text-anchor="end">${val}%</text>
+        `;
+      });
+
+      const points = rawTrend.map((val, idx) => {
+        const x = padLeft + (idx / (weeks.length - 1)) * chartWidth;
+        const y = padTop + chartHeight * (1 - val / 100);
+        return { x, y, val, week: weeks[idx] };
+      });
+
+      const polylinePoints = points.map(p => `${p.x},${p.y}`).join(' ');
+      const areaPoints = `${padLeft},${height - padBottom} ` + polylinePoints + ` ${width - padRight},${height - padBottom}`;
+
+      let nodesHtml = '';
+      points.forEach(p => {
+        nodesHtml += `
+          <text x="${p.x}" y="${height - padBottom + 18}" font-size="11" font-weight="500" fill="#8B93A7" text-anchor="middle">${p.week}</text>
+          <circle cx="${p.x}" cy="${p.y}" r="6" fill="${COLORS.signal}" stroke="#14121E" stroke-width="2" />
+          <circle cx="${p.x}" cy="${p.y}" r="3" fill="#fff" />
+          <rect x="${p.x - 16}" y="${p.y - 25}" width="32" height="18" rx="4" fill="rgba(108,60,255,0.9)" />
+          <text x="${p.x}" y="${p.y - 12}" font-size="10.5" font-weight="700" fill="#ffffff" text-anchor="middle">${p.val}%</text>
+        `;
+      });
+
+      svg.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      svg.innerHTML = `
+        <defs>
+          <linearGradient id="trendGradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${COLORS.signal}" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="${COLORS.signal}" stop-opacity="0.0"/>
+          </linearGradient>
+        </defs>
+        ${gridHtml}
+        <polygon points="${areaPoints}" fill="url(#trendGradient)" />
+        <polyline points="${polylinePoints}" fill="none" stroke="${COLORS.signal}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+        ${nodesHtml}
+      `;
+    }
+
+    function drawDonut(id) {
+      const svg = document.getElementById(id);
+      if (!svg) return;
+
+      const customers = state.customers || [];
+      const total = customers.length || 1;
+      const high = customers.filter(c => c.band === 'High').length;
+      const med = customers.filter(c => c.band === 'Medium').length;
+      const low = customers.filter(c => c.band === 'Low').length;
+
+      const highPct = Math.round((high / total) * 100);
+      const medPct = Math.round((med / total) * 100);
+      const lowPct = Math.round((low / total) * 100);
+
+      const size = 220;
+      const cx = 110, cy = 100, radius = 65, strokeWidth = 22;
+      const circumference = 2 * Math.PI * radius;
+
+      const highDash = (highPct / 100) * circumference;
+      const medDash = (medPct / 100) * circumference;
+      const lowDash = (lowPct / 100) * circumference;
+
+      const highOffset = 0;
+      const medOffset = -highDash;
+      const lowOffset = -(highDash + medDash);
+
+      svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+      svg.innerHTML = `
+        <circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="${strokeWidth}" />
+        <circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="${COLORS.critical}" stroke-width="${strokeWidth}"
+          stroke-dasharray="${highDash} ${circumference}" stroke-dashoffset="${highOffset}" transform="rotate(-90 ${cx} ${cy})" />
+        <circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="${COLORS.warn}" stroke-width="${strokeWidth}"
+          stroke-dasharray="${medDash} ${circumference}" stroke-dashoffset="${medOffset}" transform="rotate(-90 ${cx} ${cy})" />
+        <circle cx="${cx}" cy="${cy}" r="${radius}" fill="none" stroke="${COLORS.safe}" stroke-width="${strokeWidth}"
+          stroke-dasharray="${lowDash} ${circumference}" stroke-dashoffset="${lowOffset}" transform="rotate(-90 ${cx} ${cy})" />
+        <text x="${cx}" y="${cy - 4}" font-family="'Space Grotesk', sans-serif" font-size="24" font-weight="700" fill="#ffffff" text-anchor="middle">${total}</text>
+        <text x="${cx}" y="${cy + 14}" font-size="11" font-weight="600" fill="#8B93A7" text-anchor="middle">CUSTOMERS</text>
+      `;
+
+      const legend = document.getElementById('donut-legend');
+      if (legend) {
+        legend.innerHTML = `
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-main);">
+            <span style="width:10px;height:10px;border-radius:50%;background:${COLORS.critical};display:inline-block;"></span>
+            <strong>High:</strong> ${high} (${highPct}%)
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-main);">
+            <span style="width:10px;height:10px;border-radius:50%;background:${COLORS.warn};display:inline-block;"></span>
+            <strong>Med:</strong> ${med} (${medPct}%)
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-main);">
+            <span style="width:10px;height:10px;border-radius:50%;background:${COLORS.safe};display:inline-block;"></span>
+            <strong>Low:</strong> ${low} (${lowPct}%)
+          </div>
+        `;
+      }
+    }
+
+    function renderReports() {
+      document.getElementById('reports-summary').textContent = `Summary for ${state.company.name}: Monitoring ${state.customers.length} total customers with active AI retention models.`;
+    }
+
+    function exportCSV() {
+      const rows = [['id', 'name', 'risk_score', 'risk_band', 'last_active']];
+      state.customers.forEach(c => rows.push([c.id, c.name, c.risk, c.band, c.lastActive]));
+      const csv = rows.map(r => r.join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `${state.company.name.replace(/\s+/g, '_')}_churn_summary.csv`;
+      a.click();
+    }
+
+    function exportExcel() {
+      if (typeof XLSX === 'undefined') return;
+      const rows = state.customers.map(c => ({
+        ID: c.id, Name: c.name, 'Risk Score (%)': c.risk, 'Risk Band': c.band, 'Last Active': c.lastActive
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Churn Report');
+      XLSX.writeFile(wb, `${state.company.name.replace(/\s+/g, '_')}_churn_report.xlsx`);
+    }
+
+    function exportPDF() {
+      if (typeof window.jspdf === 'undefined') return;
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.text(`Churn & Retention Report - ${state.company.name}`, 14, 20);
+      doc.save(`${state.company.name.replace(/\s+/g, '_')}_churn_report.pdf`);
+    }
+  </script>
+</body>
+
+</html>
