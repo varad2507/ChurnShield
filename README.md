@@ -1,6 +1,6 @@
-# 📊 ChurnIQ — AI Customer Churn Prediction System
+# 📊 ChurnSheild — AI Customer Churn Prediction System
 
-**ChurnIQ** is an end-to-end machine learning web application built to predict customer churn probability across three distinct business domains: **E-Commerce**, **OTT Streaming Platforms**, and **Shopping Apps**[cite: 1]. The platform features high-performance FastAPI REST endpoints[cite: 1], pre-trained Scikit-learn classification models[cite: 1], and a responsive React analytical dashboard[cite: 1].
+** ChurnSheild** is an end-to-end machine learning web application built to predict customer churn probability across three distinct business domains: **E-Commerce**, **OTT Streaming Platforms**, and **Shopping Apps**[cite: 1]. The platform features high-performance FastAPI REST endpoints[cite: 1], pre-trained Scikit-learn classification models[cite: 1], and a responsive React analytical dashboard[cite: 1].
 
 ---
 
@@ -42,7 +42,9 @@
 ## 🏗️ System Architecture
 
 ```text
-├── ChurnIQ/
+├── ChurnSheild<img width="1886" height="852" alt="Screenshot 2026-08-12 001240" src="https://github.com/user-attachments/assets/508d93ee-608b-4386-b6c9-f4315eae8c3a" />
+<img width="1886" height="852" alt="Screenshot 2026-08-12 001240" src="https://github.com/user-attachments/assets/2975fb7d-cd6d-48a3-bc56-84e05aa9a4c1" />
+/
 │   ├── assets/                      # Dashboard UI assets & images[cite: 1]
 │   ├── models/                      # Pre-trained ML models (.joblib)[cite: 1]
 │   │   ├── ecommerce_model.joblib[cite: 1]
